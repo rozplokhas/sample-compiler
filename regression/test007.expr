@@ -1,0 +1,49 @@
+def two() {
+  return 2;
+  return 3
+};
+
+def write_42() {
+  write(42)
+};
+
+def assert(x) {
+  if (x) {
+    return
+  };
+  while (true) {
+    write(-1)
+  }
+};
+
+def set_i(n) {
+  i := n
+};
+
+def sample1 (x, y) {
+    def square(x) {
+      return x * x
+    };
+
+    def minus(x, y) {
+      return x - y
+    };
+
+    z := square(y);
+    return minus(x, z)
+};
+
+write(two()*2);
+write_42();
+assert(true);
+i := 3;
+set_i(100500);
+write(i);
+read(y);
+read(x);
+r := sample1(y, x);
+write(r);
+
+def useless(x, y, z, res) {
+    write(1000000000)
+}

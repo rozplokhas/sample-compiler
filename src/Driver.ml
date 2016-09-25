@@ -65,9 +65,16 @@ let _ =
 
 let main =
   try
-    let filename = Sys.argv.(1) in
-    match Parser.parse filename with
-    | `Ok stmt -> ignore @@ Expr.build stmt (Filename.chop_suffix filename ".expr")
-    | `Fail er -> Printf.eprintf "%s" er
+    let arg1 = Sys.argv.(1) in
+    if arg1 = "-i"
+    then
+      let arg2 = Sys.argv.(2) in
+      match Parser.parse arg2 with
+      | `Ok stmt -> Expr.interpret stmt
+      | `Fail er -> Printf.eprintf "%s" er
+    else
+      match Parser.parse arg1 with
+      | `Ok stmt -> ignore @@ Expr.build stmt (Filename.chop_suffix arg1 ".expr")
+      | `Fail er -> Printf.eprintf "%s" er
   with Invalid_argument _ ->
-    Printf.printf "Usage: rc.byte <name.expr>"
+    Printf.printf "Usage: rc.byte <name.expr> | rc.byte -i <name.expr>\n"

@@ -1,0 +1,12 @@
+read (n);
+i := 0;
+while (i < n) {
+  write(i);
+  i := i + 1;
+  if (i >= n) {
+    write (i)
+  }
+};
+if (false) {
+   write (-1)
+}
