@@ -1,13 +1,38 @@
+module BinOpEval : sig
+
+  val fun_of_string : string -> int -> int -> int
+
+end = struct
+
+  let intf_of_boolf : (int -> int -> bool) -> int -> int -> int =
+    fun op x y -> if op x y then 1 else 0
+
+  let fun_of_string s = List.assoc s
+    ["+",  ( +   );
+     "-",  ( -   );
+     "*",  ( *   );
+     "/",  ( /   );
+     "%",  ( mod );
+     "<",  intf_of_boolf ( <  );
+     "<=", intf_of_boolf ( <= );
+     ">",  intf_of_boolf ( >  );
+     ">=", intf_of_boolf ( >= );
+     "==", intf_of_boolf ( =  );
+     "!=", intf_of_boolf ( <> );
+     "&&", intf_of_boolf (fun x y -> x <> 0 && y <> 0);
+     "||", intf_of_boolf (fun x y -> x <> 0 || y <> 0)]
+
+end 
+
+  
 module Expr =
   struct
-
     open Language.Expr
-
+                                                            
     let rec eval state = function
     | Const  n -> n
     | Var    x -> state x
-    | Binop  _ -> failwith "not supported"
- 
+    | Binop  (s, x, y) -> BinOpEval.fun_of_string s (eval state x) (eval state y)
   end
   
 module Stmt =
