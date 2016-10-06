@@ -20,7 +20,7 @@ end = struct
      "==", intf_of_boolf ( =  );
      "!=", intf_of_boolf ( <> );
      "&&", intf_of_boolf (fun x y -> x <> 0 && y <> 0);
-     "||", intf_of_boolf (fun x y -> x <> 0 || y <> 0)]
+     "!!", intf_of_boolf (fun x y -> x <> 0 || y <> 0)]
 
 end 
 

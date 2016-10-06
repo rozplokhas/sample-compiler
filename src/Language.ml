@@ -11,8 +11,8 @@ module Expr =
 
     ostap (
       parse:
-          l:andi suf:("||" andi)* {
-          List.fold_left (fun l (op, r) -> Binop ("||", l, r)) l suf
+          l:andi suf:("!!" andi)* {
+          List.fold_left (fun l (op, r) -> Binop ("!!", l, r)) l suf
         }
       | andi;
 
