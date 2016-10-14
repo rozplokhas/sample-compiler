@@ -23,23 +23,26 @@ let esi = R  3
 let edi = R  4
 
 type instr =
-| X86Add  of opnd * opnd
-| X86Sub  of opnd * opnd
-| X86Mul  of opnd * opnd
-| X86Mov  of opnd * opnd
-| X86Xchg of opnd * opnd
-| X86Xor  of opnd * opnd
-| X86Cmp  of opnd * opnd
-| X86Or   of opnd * opnd
-| X86And  of opnd * opnd
-| X86Push of opnd
-| X86Pop  of opnd
-| X86Div  of opnd
+| X86Add   of opnd * opnd
+| X86Sub   of opnd * opnd
+| X86Mul   of opnd * opnd
+| X86Mov   of opnd * opnd
+| X86Xchg  of opnd * opnd
+| X86Xor   of opnd * opnd
+| X86Cmp   of opnd * opnd
+| X86Or    of opnd * opnd
+| X86And   of opnd * opnd
+| X86Push  of opnd
+| X86Pop   of opnd
+| X86Div   of opnd
 | X86Ret
 | X86Cdq
-| X86Call of string
-| X86Set  of string * string
-
+| X86Call  of string
+| X86Jmp   of string
+| X86Label of string
+| X86Set   of string * string
+| X86Jmpc  of string * string
+  
 let cmps = [
     "<=", "le";
     "<" , "l" ;
@@ -80,22 +83,25 @@ module Show =
     | L  i -> Printf.sprintf "$%d" i
 
     let instr = function
-    | X86Add  (s1, s2)   -> Printf.sprintf "\taddl\t%s,\t%s"  (opnd s1) (opnd s2)
-    | X86Sub  (s1, s2)   -> Printf.sprintf "\tsubl\t%s,\t%s"  (opnd s1) (opnd s2)
-    | X86Mul  (s1, s2)   -> Printf.sprintf "\timull\t%s,\t%s" (opnd s1) (opnd s2)
-    | X86Mov  (s1, s2)   -> Printf.sprintf "\tmovl\t%s,\t%s"  (opnd s1) (opnd s2)
-    | X86Xchg (s1, s2)   -> Printf.sprintf "\txchg\t%s,\t%s"  (opnd s1) (opnd s2)
-    | X86Xor  (s1, s2)   -> Printf.sprintf "\txorl\t%s,\t%s"  (opnd s1) (opnd s2)
-    | X86Cmp  (s1, s2)   -> Printf.sprintf "\tcmp\t%s,\t%s"   (opnd s1) (opnd s2)
-    | X86Or   (s1, s2)   -> Printf.sprintf "\torl\t%s,\t%s"   (opnd s1) (opnd s2)
-    | X86And  (s1, s2)   -> Printf.sprintf "\tandl\t%s,\t%s"  (opnd s1) (opnd s2)
-    | X86Push  s         -> Printf.sprintf "\tpushl\t%s"      (opnd s )
-    | X86Pop   s         -> Printf.sprintf "\tpopl\t%s"       (opnd s )
-    | X86Div   s         -> Printf.sprintf "\tidiv\t%s"       (opnd s )
-    | X86Ret             -> "\tret"
-    | X86Cdq             -> "\tcdq"
-    | X86Call  p         -> Printf.sprintf "\tcall\t%s" p
-    | X86Set  (cmp, reg) -> Printf.sprintf "\tset%s\t%%%s" cmp reg
+    | X86Add   (s1, s2)   -> Printf.sprintf "\taddl\t%s,\t%s"  (opnd s1) (opnd s2)
+    | X86Sub   (s1, s2)   -> Printf.sprintf "\tsubl\t%s,\t%s"  (opnd s1) (opnd s2)
+    | X86Mul   (s1, s2)   -> Printf.sprintf "\timull\t%s,\t%s" (opnd s1) (opnd s2)
+    | X86Mov   (s1, s2)   -> Printf.sprintf "\tmovl\t%s,\t%s"  (opnd s1) (opnd s2)
+    | X86Xchg  (s1, s2)   -> Printf.sprintf "\txchg\t%s,\t%s"  (opnd s1) (opnd s2)
+    | X86Xor   (s1, s2)   -> Printf.sprintf "\txorl\t%s,\t%s"  (opnd s1) (opnd s2)
+    | X86Cmp   (s1, s2)   -> Printf.sprintf "\tcmp\t%s,\t%s"   (opnd s1) (opnd s2)
+    | X86Or    (s1, s2)   -> Printf.sprintf "\torl\t%s,\t%s"   (opnd s1) (opnd s2)
+    | X86And   (s1, s2)   -> Printf.sprintf "\tandl\t%s,\t%s"  (opnd s1) (opnd s2)
+    | X86Push   s         -> Printf.sprintf "\tpushl\t%s"      (opnd s )
+    | X86Pop    s         -> Printf.sprintf "\tpopl\t%s"       (opnd s )
+    | X86Div    s         -> Printf.sprintf "\tidiv\t%s"       (opnd s )
+    | X86Ret              -> "\tret"
+    | X86Cdq              -> "\tcdq"
+    | X86Call   p         -> Printf.sprintf "\tcall\t%s" p
+    | X86Jmp    p         -> Printf.sprintf "\tjmp\t%s"  p
+    | X86Label  p         -> Printf.sprintf "%s:"        p
+    | X86Set   (cmp, reg) -> Printf.sprintf "\tset%s\t%%%s" cmp reg
+    | X86Jmpc  (cmp, p  ) -> Printf.sprintf "\tj%s\t%s"   cmp p
 
   end
 
@@ -117,38 +123,38 @@ module Compile =
               in
               let div_code (src, dest) = [X86Xchg (eax, dest); X86Cdq; X86Div src; X86Xchg (eax, dest)] in
               match i with
-              | S_READ      -> ([eax], [X86Call "read"])
-              | S_WRITE     -> ([], [X86Push (R 0); X86Call "write"; X86Pop (R 0)])
-              | S_PUSH n    ->
+              | S_READ        -> ([eax], [X86Call "read"])
+              | S_WRITE       -> ([], [X86Push (R 0); X86Call "write"; X86Pop (R 0)])
+              | S_PUSH n      ->
 		  let s = allocate env stack in
 		  (s::stack, [X86Mov (L n, s)])
-              | S_LD x      ->
+              | S_LD x        ->
 		  env#local x;
 		  let s = allocate env stack in
                   let src, pref = safe_prefix (M x, s) in 
 		  (s::stack, pref @ [X86Mov (src, s)])
-              | S_ST x      ->
+              | S_ST x        ->
 	          env#local x;
 		  let s::stack' = stack in
                   let src, pref = safe_prefix (s, M x) in
 		  (stack', pref @ [X86Mov (src, M x)])
-	      | S_BINOP "+" ->
+	      | S_BINOP "+"   ->
                   let y::x::stack' = stack in
                   let src, pref = safe_prefix (y, x) in
                   (x::stack', pref @ [X86Add (src, x)])
-              | S_BINOP "-" ->
+              | S_BINOP "-"   ->
                   let y::x::stack' = stack in
                   let src, pref = safe_prefix (y, x) in
                   (x::stack', pref @ [X86Sub (src, x)])
-              | S_BINOP "*" ->
+              | S_BINOP "*"   ->
                   let y::x::stack' = stack in
                   (match x with
                    | S _ -> x::stack', [X86Mov (x, RR 0); X86Mul (y, RR 0); X86Mov (RR 0, x)]
                    | _   -> x::stack', [X86Mul (y, x)])
-              | S_BINOP "/" ->
+              | S_BINOP "/"   ->
                   let y::x::stack' = stack in
                   (x::stack', div_code (y, x))
-              | S_BINOP "%" ->
+              | S_BINOP "%"   ->
                   let y::x::stack' = stack in
                   (x::stack', div_code (y, x) @ [X86Mov (edx, x)])
               | S_BINOP c when List.mem c (fst @@ List.split cmps) ->
@@ -156,17 +162,22 @@ module Compile =
                   let op = List.assoc c cmps in
                   (x::stack', [X86Mov (x, RR 0); X86Mov (eax, x);   X86Xor  (eax, eax);
                                X86Cmp (y, RR 0); X86Set (op, "al"); X86Xchg (eax, x  )])
-              | S_BINOP "!!" ->
+              | S_BINOP "!!"  ->
                   let y::x::stack' = stack in
                   (x::stack', [X86Mov  (x,   RR 0); X86Mov (eax, x   ); X86Or  (y,    RR 0);
-                              X86Xor  (eax, eax ); X86Cmp (L 0, RR 0); X86Set ("ne", "al");
-                              X86Xchg (eax, x   )])
-              | S_BINOP "&&" ->
+                               X86Xor  (eax, eax ); X86Cmp (L 0, RR 0); X86Set ("ne", "al");
+                               X86Xchg (eax, x   )])
+              | S_BINOP "&&"  ->
                   let y::x::stack' = stack in
                   (x::stack', [X86Mov (x,   RR 0); X86Mov  (eax,  x   ); X86Xor (eax,  eax );
-                              X86Cmp (L 0, y   ); X86Set  ("ne", "al"); X86Mov (eax,  y   );
-                              X86Xor (eax, eax ); X86Cmp  (L 0,  RR 0); X86Set ("ne", "al");
-                              X86And (y,   eax ); X86Xchg (eax,  x   )])
+                               X86Cmp (L 0, y   ); X86Set  ("ne", "al"); X86Mov (eax,  y   );
+                               X86Xor (eax, eax ); X86Cmp  (L 0,  RR 0); X86Set ("ne", "al");
+                               X86And (y,   eax ); X86Xchg (eax,  x   )])
+              | S_JMP   p     -> (stack, [X86Jmp   p])
+              | S_JMPC (c, p) ->
+                 let x::stack' = stack in
+                 (stack', [X86Cmp (L 0, x); X86Jmpc (c, p)])
+              | S_LABEL p     -> (stack, [X86Label p])
 	    in
 	    x86code @ compile stack' code'
       in

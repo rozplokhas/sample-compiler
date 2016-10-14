@@ -42,15 +42,22 @@ module Stmt =
 
     let eval input stmt =
       let rec eval' ((state, input, output) as c) stmt =
-	let state' x = List.assoc x state in
+	let state_fun st x = List.assoc x st in
+        let state' = state_fun state in
 	match stmt with
-	| Skip          -> c
-	| Seq    (l, r) -> eval' (eval' c l) r
-	| Assign (x, e) -> ((x, Expr.eval state' e) :: state, input, output)
-	| Write   e     -> (state, input, output @ [Expr.eval state' e])
-	| Read    x     ->
+	| Skip               -> c
+	| Seq    (l, r)      -> eval' (eval' c l) r
+	| Assign (x, e)      -> ((x, Expr.eval state' e) :: state, input, output)
+	| Write   e          -> (state, input, output @ [Expr.eval state' e])
+	| Read    x          ->
 	    let y::input' = input in
 	    ((x, y) :: state, input', output)
+        | If     (e, st, sf) -> if Expr.eval state' e <> 0 then eval' c st else eval' c sf
+        | While  (e, s)      ->
+           let conf_ref = ref c
+           in while Expr.eval (let (st, _, _) = !conf_ref in state_fun st) e <> 0 do
+             conf_ref := eval' !conf_ref s
+           done; !conf_ref
       in
       let (_, _, result) = eval' ([], input, []) stmt in
       result
