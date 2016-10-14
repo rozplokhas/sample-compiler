@@ -10,13 +10,13 @@ module Expr =
     | Binop of string * t * t
 
     ostap (
-      parse:
+      (* parse:
           l:compi suf:(("!!"|"&&") compi)* {
           List.fold_left (fun l (op, r) -> Binop (Token.repr op, l, r)) l suf
         }
-      | compi;
+      | compi; *)
 
-      (* parse:
+      parse:
           l:andi suf:("!!" andi)* {
           List.fold_left (fun l (op, r) -> Binop ("!!", l, r)) l suf
         }
@@ -26,7 +26,7 @@ module Expr =
           l:compi suf:("&&" compi)* {
           List.fold_left (fun l (op, r) -> Binop ("&&", l, r)) l suf
         }
-      | compi;*)
+      | compi;
       
       compi:
         l:addi suf:(("<=" | "<" | "==" | "!=" | ">=" | ">") addi)* {
