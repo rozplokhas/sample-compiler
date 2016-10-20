@@ -70,8 +70,19 @@ module Stmt =
       | %"read"  "(" x:IDENT ")"                                      {Read x}
       | %"write" "(" e:!(Expr.parse) ")"                              {Write e}
       | %"skip"                                                       {Skip}
-      | %"if" e:!(Expr.parse) %"then" s1:parse %"else" s2:parse %"fi" {If    (e, s1, s2)}
-      | %"while" e:!(Expr.parse) %"do" s:parse %"od"                  {While (e, s     )}
+      (*| %"if" e:!(Expr.parse) %"then" s1:parse %"else" s2:parse %"fi" {If    (e, s1, s2)}*)
+      |        %"if"  e:!(Expr.parse)   %"then" s:parse
+        els:(-(%"elif") !(Expr.parse) -(%"then")  parse)*
+         el:(-(%"else")                           parse)?
+               %"fi"
+                            {List.fold_right (fun (e, s) acc -> If (e, s, acc))
+                                             ((e, s)::els)
+                                             (match el with None -> Skip | Some d -> d)                
+                            }
+      | %"while" e:!(Expr.parse) %"do" s:parse %"od"                  {While (e, s)}
+      | %"repeat" s:parse %"until" e:!(Expr.parse)                    {Seq   (s, While (Binop ("==", e, Const 0), s))}
+      | %"for" s1:parse "," e:!(Expr.parse) "," s2:parse
+              %"do" s:parse %"od"                                     {Seq   (s1, While (e, Seq (s, s2)))}
     )
 
   end
