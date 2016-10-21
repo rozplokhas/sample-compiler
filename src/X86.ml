@@ -39,10 +39,10 @@ type instr =
 | X86Cdq
 | X86Call  of string
 | X86Jmp   of string
+| X86Jmpz  of string
 | X86Label of string
 | X86Set   of string * string
-| X86Jmpc  of string * string
-  
+
 let cmps = [
     "<=", "le";
     "<" , "l" ;
@@ -99,10 +99,10 @@ module Show =
     | X86Cdq              -> "\tcdq"
     | X86Call   p         -> Printf.sprintf "\tcall\t%s" p
     | X86Jmp    p         -> Printf.sprintf "\tjmp\t%s"  p
+    | X86Jmpz   p         -> Printf.sprintf "\tjz\t%s"   p
     | X86Label  p         -> Printf.sprintf "%s:"        p
     | X86Set   (cmp, reg) -> Printf.sprintf "\tset%s\t%%%s" cmp reg
-    | X86Jmpc  (cmp, p  ) -> Printf.sprintf "\tj%s\t%s"   cmp p
-
+    
   end
 
 module Compile =
@@ -121,10 +121,14 @@ module Compile =
                 | S _, S _ | S _, M _ | M _, S _ -> RR 0, [X86Mov (src, RR 0)]  
                 | _                              -> src, []
               in
-              let div_code (src, dest) = [X86Xchg (eax, dest); X86Cdq; X86Div src; X86Xchg (eax, dest)] in
+              let div_code (src, dest) = [X86Xchg (eax, dest);
+                                          X86Cdq; X86Div src;
+                                          X86Xchg (eax, dest)] in
               match i with
               | S_READ        -> ([eax], [X86Call "read"])
-              | S_WRITE       -> ([], [X86Push (R 0); X86Call "write"; X86Pop (R 0)])
+              | S_WRITE       -> ([], [X86Push (R 0);
+                                       X86Call "write";
+                                       X86Pop (R 0)])
               | S_PUSH n      ->
 		  let s = allocate env stack in
 		  (s::stack, [X86Mov (L n, s)])
@@ -149,7 +153,9 @@ module Compile =
               | S_BINOP "*"   ->
                   let y::x::stack' = stack in
                   (match x with
-                   | S _ -> x::stack', [X86Mov (x, RR 0); X86Mul (y, RR 0); X86Mov (RR 0, x)]
+                   | S _ -> x::stack', [X86Mov (x, RR 0);
+                                        X86Mul (y, RR 0);
+                                        X86Mov (RR 0, x)]
                    | _   -> x::stack', [X86Mul (y, x)])
               | S_BINOP "/"   ->
                   let y::x::stack' = stack in
@@ -160,28 +166,45 @@ module Compile =
               | S_BINOP c when List.mem c (fst @@ List.split cmps) ->
                   let y::x::stack' = stack in
                   let op = List.assoc c cmps in
-                  (x::stack', [X86Mov (x, RR 0); X86Mov (eax, x);   X86Xor  (eax, eax);
-                               X86Cmp (y, RR 0); X86Set (op, "al"); X86Xchg (eax, x  )])
+                  (x::stack', [X86Mov  (x,   RR 0);
+                               X86Mov  (eax, x   );
+                               X86Xor  (eax, eax );
+                               X86Cmp  (y,   RR 0);
+                               X86Set  (op,  "al");
+                               X86Xchg (eax, x   )])
               | S_BINOP "!!"  ->
                   let y::x::stack' = stack in
-                  (x::stack', [X86Mov  (x,   RR 0); X86Mov (eax, x   ); X86Or  (y,    RR 0);
-                               X86Xor  (eax, eax ); X86Cmp (L 0, RR 0); X86Set ("ne", "al");
-                               X86Xchg (eax, x   )])
+                  (x::stack', [X86Mov  (x,    RR 0);
+                               X86Mov  (eax,  x   );
+                               X86Or   (y,    RR 0);
+                               X86Xor  (eax,  eax );
+                               X86Cmp  (L 0,  RR 0);
+                               X86Set  ("ne", "al");
+                               X86Xchg (eax,  x   )])
               | S_BINOP "&&"  ->
                   let y::x::stack' = stack in
-                  (x::stack', [X86Mov (x,   RR 0); X86Mov  (eax,  x   ); X86Xor (eax,  eax );
-                               X86Cmp (L 0, y   ); X86Set  ("ne", "al"); X86Mov (eax,  y   );
-                               X86Xor (eax, eax ); X86Cmp  (L 0,  RR 0); X86Set ("ne", "al");
-                               X86And (y,   eax ); X86Xchg (eax,  x   )])
+                  (x::stack', [X86Mov  (x,    RR 0);
+                               X86Mov  (eax,  x   );
+                               X86Xor  (eax,  eax );
+                               X86Cmp  (L 0,  y   );
+                               X86Set  ("ne", "al");
+                               X86Mov  (eax,  y   );
+                               X86Xor  (eax,  eax );
+                               X86Cmp  (L 0,  RR 0);
+                               X86Set  ("ne", "al");
+                               X86And  (y,    eax );
+                               X86Xchg (eax,  x   )])
               | S_JMP   p     -> (stack, [X86Jmp   p])
-              | S_JMPC (c, p) ->
+              | S_JMPZ  p     ->
                  let x::stack' = stack in
-                 (stack', [X86Cmp (L 0, x); X86Jmpc (c, p)])
+                 (stack', [X86Cmp (L 0, x); X86Jmpz p])
               | S_LABEL p     -> (stack, [X86Label p])
 	    in
 	    x86code @ compile stack' code'
       in
-      compile [] code
+      let del_nop = List.filter (fun i -> i <> X86Mov (eax, eax) && i <> X86Xchg (eax, eax))
+      in
+      del_nop @@ compile [] code
 
   end
 

@@ -6,7 +6,7 @@ type i =
 | S_ST    of string
 | S_BINOP of string
 | S_JMP   of string
-| S_JMPC  of string * string
+| S_JMPZ  of string
 | S_LABEL of string
 
 module Interpreter =
@@ -29,22 +29,22 @@ module Interpreter =
               | S_WRITE   ->
 		  let y::stack' = stack in
 		  transmit (state, stack', input, output @ [y])
-              | S_PUSH n  ->
+              | S_PUSH  n ->
 		  transmit (state, n::stack, input, output)
-              | S_LD x    ->
+              | S_LD    x ->
 		  transmit (state, (List.assoc x state)::stack, input, output)
-              | S_ST x    ->
+              | S_ST    x ->
 		  let y::stack' = stack in
 		  transmit ((x, y)::state, stack', input, output)
               | S_BINOP s ->
                   let y::x::stack' = stack in
                   let r = Interpreter.BinOpEval.fun_of_string s x y in
                   transmit (state, r::stack', input, output)
-              | S_JMP l   -> run' conf (jump l full_code)
-              | S_JMPC (c, l) when c = "z" || c = "nz" ->
+              | S_JMP   l -> run' conf (jump l full_code)
+              | S_JMPZ  l ->
                  let x::stack' = stack in
                  let conf' = (state, stack', input, output) in
-                 if c = "z" && x = 0 || c = "nz" && x <> 0
+                 if x = 0
                  then run' conf' (jump l full_code)
                  else transmit conf'
               | S_LABEL _ -> transmit conf
@@ -75,21 +75,19 @@ module Compile =
     | Seq    (l, r)      -> stmt l @ stmt r
     | If     (e, st, sf) ->
        let no = string_of_int (get_and_inc label_counter)
-       in expr e                    @
-         [S_JMPC  ("nz", "then"^no);
-          S_JMP   ("else"^no);
-          S_LABEL ("then"^no)]      @
-          stmt st                   @
+       in expr e               @
+         [S_JMPZ  ("else"^no)] @
+          stmt st              @
          [S_JMP   ("fin"^no);
-          S_LABEL ("else"^no)]      @
-          stmt sf                   @
+          S_LABEL ("else"^no)] @
+          stmt sf              @
          [S_LABEL ("fin"^no)]
     | While (e, s)       ->
        let no = string_of_int (get_and_inc label_counter)
-       in [S_LABEL ("start"^no)]    @
-           expr e                   @
-          [S_JMPC  ("z", "fin"^no)] @
-           stmt s                   @
+       in [S_LABEL ("start"^no)] @
+           expr e                @
+          [S_JMPZ  ("fin"^no)]   @
+           stmt s                @
           [S_JMP   ("start"^no);
            S_LABEL ("fin"^no)]
                 
