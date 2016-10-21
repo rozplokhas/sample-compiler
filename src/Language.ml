@@ -9,38 +9,22 @@ module Expr =
     | Var   of string
     | Binop of string * t * t
 
-    ostap (
-      parse:
-          l:andi suf:("!!" andi)* {
-          List.fold_left (fun l (op, r) -> Binop ("!!", l, r)) l suf
-        }
-      | andi;
-
-      andi:
-          l:compi suf:("&&" compi)* {
-          List.fold_left (fun l (op, r) -> Binop ("&&", l, r)) l suf
-        }
-      | compi;
       
-      compi:
-        l:addi suf:(("<=" | "<" | "==" | "!=" | ">=" | ">") addi)* {
-           List.fold_left (fun l (op, r) -> Binop (Token.repr op, l, r)) l suf
-        }
-      | addi;
+ostap (
+  parse:
+    !(Ostap.Util.expr
+        (fun x -> x)
+        (Array.map (fun (a, s) -> a,
+                      List.map (fun s -> ostap(- $(s)), (fun x y -> Binop (s, x, y))) s)
+                   [|
+                     `Lefta, ["!!"];
+                     `Lefta, ["&&"];
+                     `Nona, ["=="; "!="; "<="; "<"; ">="; ">"];
+                     `Lefta, ["+"; "-"];
+                     `Lefta, ["*"; "/"; "%"]
+                   |]) primary);
 
-      addi:
-        l:mulli suf:(("+" | "-") mulli)* {
-          List.fold_left (fun l (op, r) -> Binop (Token.repr op, l, r)) l suf
-        }
-      | mulli;
-
-      mulli:
-        l:primary suf:(("*" | "/" | "%") primary)* {
-           List.fold_left (fun l (op, r) -> Binop (Token.repr op, l, r)) l suf
-        }
-      | primary;
-
-      primary:
+  primary:
         n:DECIMAL {Const n}
       | x:IDENT   {Var   x}
       | -"(" parse -")"
