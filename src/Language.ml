@@ -70,7 +70,6 @@ module Stmt =
       | %"read"  "(" x:IDENT ")"                                      {Read x}
       | %"write" "(" e:!(Expr.parse) ")"                              {Write e}
       | %"skip"                                                       {Skip}
-      (*| %"if" e:!(Expr.parse) %"then" s1:parse %"else" s2:parse %"fi" {If    (e, s1, s2)}*)
       |        %"if"  e:!(Expr.parse)   %"then" s:parse
         els:(-(%"elif") !(Expr.parse) -(%"then")  parse)*
          el:(-(%"else")                           parse)?
