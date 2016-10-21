@@ -1,3 +1,3 @@
-Test\tgcc-O0\texpr\tgcc-O3
-001	29.43	27.24	3.91
-002	29.61	27.55	3.89
+Test\tgcc-O0\texpr\texpr-so\tgcc-O3
+001	29.33	27.12	3.88
+002	29.31	27.27	3.85
