@@ -5,9 +5,10 @@ let parse infile =
   Util.parse
     (object
        inherit Matcher.t s
-       inherit Util.Lexers.ident ["read"; "write"; "skip"; "if"; "then";
-                                  "elif"; "else"; "fi"; "while"; "do";
-                                  "od"; "repeat"; "until"; "for"] s
+       inherit Util.Lexers.ident ["read"; "write" ; "skip" ; "if"   ; "then"  ;
+                                  "elif"; "else"  ; "fi"   ; "while"; "do"    ;
+                                  "od"  ; "repeat"; "until"; "for"  ; "return";
+                                  "fun" ; "begin" ; "end"] s
        inherit Util.Lexers.decimal s
        inherit Util.Lexers.skip [
 	 Matcher.Skip.whitespaces " \t\n";
@@ -16,7 +17,7 @@ let parse infile =
        ] s
      end
     )
-    (ostap (!(Language.Stmt.parse) -EOF))
+    (ostap (!(Language.Prog.parse) -EOF))
 
 let main = ()
   try
@@ -27,7 +28,8 @@ let main = ()
       | _    -> `Int, Sys.argv.(1)
     in
     match parse filename with
-    | `Ok stmt -> 
+    | `Ok stmt ->
+        let stmt = Language.Stmt.Skip in
 	(match mode with
 	 | `X86 ->
              let basename = Filename.chop_suffix filename ".expr" in 

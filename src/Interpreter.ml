@@ -24,6 +24,7 @@ end = struct
 
 end 
 
+ 
   
 module Expr =
   struct
@@ -51,7 +52,7 @@ module Stmt =
 	| Write   e          -> (state, input, output @ [Expr.eval state' e])
 	| Read    x          ->
 	    let y::input' = input in
-	    ((x, y) :: state, input', output)
+	    ((x, y) :: state, in put', output)
         | If     (e, st, sf) -> if Expr.eval state' e <> 0 then eval' c st else eval' c sf
         | While  (e, s)      ->
            let conf_ref = ref c
