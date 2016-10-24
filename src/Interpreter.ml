@@ -27,7 +27,7 @@ end = struct
 end
 
 
-module Env : sig
+(* module Env : sig
 
     type t
 
@@ -61,7 +61,7 @@ end = struct
     let get_output          (_,  _,  _,     outp) = outp
     let update_io  inp outp (vm, fm, _,     _   ) = (vm, fm, inp, outp)
 
-end
+end *)
 
 
 module Expr = struct

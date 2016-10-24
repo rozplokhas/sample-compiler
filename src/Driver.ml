@@ -18,14 +18,12 @@ let parse infile =
         end)
         (ostap (!(Language.Prog.parse) -EOF))
 
-let stmt = Language.Stmt.Skip
-
 let main = ()
     try
         let mode, filename =
             match Sys.argv.(1) with
             | "-i" -> `Int, Sys.argv.(2)
-            | "-s" -> `Sm,  Sys.argv.(2)
+            | "-s" -> `SM,  Sys.argv.(2)
             | _    -> `X86, Sys.argv.(1)
         in
         match parse filename with
@@ -34,7 +32,7 @@ let main = ()
                 match mode with
                 | `X86 ->
                     let basename = Filename.chop_suffix filename ".expr" in 
-                    X86.build stmt basename
+                    X86.build prog basename
                 | _ ->
                     let rec read acc =
                         try
@@ -46,7 +44,7 @@ let main = ()
                     let input = read [] in
                     let output =
                         match mode with
-                        | `SM -> StackMachine.Interpreter.run input (StackMachine.Compile.stmt stmt)
+                        | `SM -> StackMachine.Interpreter.run input (StackMachine.Compile.prog prog)
                         | _   -> Interpreter.Prog.interpret input prog
                     in
                     List.iter (fun i -> Printf.printf "%d\n" i) output
