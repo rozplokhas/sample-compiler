@@ -27,43 +27,6 @@ end = struct
 end
 
 
-(* module Env : sig
-
-    type t
-
-    val with_input : int list -> t
-    val local      : t -> t
-    val add_var    : string -> int                        -> t -> t
-    val add_fun    : string -> (int list -> t -> int * t) -> t -> t
-    val find_var   : string -> t -> int
-    val find_fun   : string -> t -> (int list -> t -> int * t)
-    val read_int   : t -> int * t
-    val write_int  : int -> t -> t
-    val get_input  : t -> int list
-    val get_output : t -> int list
-    val update_io  : int list -> int list -> t -> t
-
-end = struct
-
-    module StringMap = Map.Make (String)
-
-    type t = int StringMap.t * (int list -> t -> int * t) StringMap.t * int list * int list
-
-    let with_input inp                            = (StringMap.empty, StringMap.empty, inp, [])
-    let local               (_,  fm, inp,   outp) = (StringMap.empty, fm, inp, outp)
-    let add_var    x   v    (vm, fm, inp,   outp) = (StringMap.add x v vm, fm, inp, outp)
-    let add_fun    x   f    (vm, fm, inp,   outp) = (vm, StringMap.add x f fm, inp, outp)
-    let find_var   x        (vm, _,  inp,   outp) = StringMap.find x vm
-    let find_fun   x        (_ , fm, inp,   outp) = StringMap.find x fm
-    let read_int            (vm, fm, i::is, outp) = i, (vm, fm, is, outp)
-    let write_int  i        (vm, fm, inp,   outp) = (vm, fm, inp, i::outp)
-    let get_input           (_,  _,  inp,   _   ) = inp
-    let get_output          (_,  _,  _,     outp) = outp
-    let update_io  inp outp (vm, fm, _,     _   ) = (vm, fm, inp, outp)
-
-end *)
-
-
 module Expr = struct
 
     open Language.Expr
