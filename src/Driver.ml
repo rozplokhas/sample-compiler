@@ -1,80 +1,54 @@
-open Expr
-open Parser
+open Ostap
 
-(*
-(*
-read (x);
-read (y);
-z := x * x;
-write (z+y)
-*)
-let p =
-  Seq (
-      Read "x",
-      Seq (
-          Read "y",
-          Seq (
-              Assign ("z", Mul (Var "x", Var "x")),
-              Write (Add (Var "z", Var "y"))
-          )
-      )
-    )
+let parse infile =
+    let s = Util.read infile in
+    Util.parse
+        (object
+            inherit Matcher.t s
+            inherit Util.Lexers.ident ["read"; "write" ; "skip" ; "if"   ; "then"  ;
+                                       "elif"; "else"  ; "fi"   ; "while"; "do"    ;
+                                       "od"  ; "repeat"; "until"; "for"  ; "return";
+                                       "fun" ; "begin" ; "end"                     ] s
+            inherit Util.Lexers.decimal s
+            inherit Util.Lexers.skip [
+                Matcher.Skip.whitespaces " \t\n";
+                Matcher.Skip.lineComment "--";
+                Matcher.Skip. nestedComment "(*" "*)"
+            ] s
+        end)
+        (ostap (!(Language.Prog.parse) -EOF))
 
-(* let _ = *)
-(*   let [r] = run [3; 4] p in *)
-(*   Printf.printf "%d\n" r *)
-
-let ( !! )       = (!)
-let ( !  ) x     = Var x
-let ( $  ) n     = Const n
-let ( +  ) e1 e2 = Add (e1, e2)
-let ( *  ) e1 e2 = Mul (e1, e2)
-
-let skip     = Skip
-let (:=) x e = Assign (x, e)
-let read x   = Read x
-let write x  = Write x
-let (|>) l r = Seq (l, r)
-
-(*
-read (x);
-read (y);
-z := x * x;
-write (z+y)
-*)
-
-let p =
-  read "x" |>
-  read "y" |>
-  ("z" := !"x" * !"x") |>
-  write (!"z" + !"y")
-
-(*
-let _ =
-  let [r] = run [3; 4] p in
-  Printf.printf "%d\n" r
-
-let run input p =
-  srun input (compile_stmt p)
-
-let _ =
-  let [r] = run [3; 4] p in
-  Printf.printf "%d\n" r
-*)
-*)
-
-let main =
-  try
-    let arg1 = Sys.argv.(1) in
-    if arg1 = "-i"
-    then
-      let arg2 = Sys.argv.(2) in
-      match Parser.parse arg2 with
-      | `Ok stmt -> Expr.interpret stmt
-      | `Fail er -> Printf.eprintf "%s" er
-    else
-      match Parser.parse arg1 with
-      | `Ok stmt -> ignore @@ Expr.build stmt (Filename.chop_suffix arg1 ".expr")
-      | `Fail er -> Printf.eprintf "%s" er
-  with Invalid_argument _ ->
-    Printf.printf "Usage: rc.byte <name.expr> | rc.byte -i <name.expr>\n"
+let main = ()
+    try
+        let mode, filename =
+            match Sys.argv.(1) with
+            | "-i" -> `Int, Sys.argv.(2)
+            | "-s" -> `SM,  Sys.argv.(2)
+            | _    -> `X86, Sys.argv.(1)
+        in
+        match parse filename with
+        | `Ok prog -> 
+            (
+                match mode with
+                | `X86 ->
+                    let basename = Filename.chop_suffix filename ".expr" in 
+                    X86.build prog basename
+                | _ ->
+                    let rec read acc =
+                        try
+                            let r = read_int () in
+                            Printf.printf "> ";
+                            read (acc @ [r]) 
+                        with End_of_file -> acc
+                    in
+                    let input = read [] in
+                    let output =
+                        match mode with
+                        | `SM -> StackMachine.Interpreter.run input (StackMachine.Compile.prog prog)
+                        | _   -> Interpreter.Prog.interpret input prog
+                    in
+                    List.iter (fun i -> Printf.printf "%d\n" i) output
+            )
+        | `Fail er -> Printf.eprintf "%s" er
+    with 
+    | Invalid_argument _ -> Printf.printf "Usage: rc.byte <name.expr>"

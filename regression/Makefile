@@ -1,15 +1,19 @@
-ALLTESTS=test001 test002 test003 test004 test005 test006
-ITESTS=test007 test008
+TESTS=test001 test002 test003 test004 test005 test006 test007 test008 test009 test010 test012 test013 test014 test015 test016 test017 test018 test019 test020 test021 test022 test023
+INTERPRETER_TESTS=my_test001 my_test002 test011
 
-.PHONY: check $(ALLTESTS) $(ITESTS)
-check: $(ALLTESTS) $(ITESTS)
 
-$(ALLTESTS): %: %.expr %.input orig/%.log
-	../src/rc.byte $@.expr && cat $@.input | ./$@ > $@.log && diff $@.log orig/$@.log
-	cat $@.input | ../src/rc.byte -i $@.expr > $@.log && diff $@.log orig/$@.log
+.PHONY: check $(TESTS) $(INTERPRETER_TESTS) 
 
-$(ITESTS): %: %.expr %.input orig/%.log
-	cat $@.input | ../src/rc.byte -i $@.expr > $@.log && diff $@.log orig/$@.log
+check: $(TESTS) $(INTERPRETER_TESTS) 
+
+$(TESTS): %: %.expr
+	cat $@.input | ../rc.native -i $< > $@.log && diff $@.log orig/$@.log
+	cat $@.input | ../rc.native -s $< > $@.log && diff $@.log orig/$@.log
+	RC_RUNTIME=../runtime ../rc.native     $< && cat $@.input | ./$@ > $@.log && diff $@.log orig/$@.log
+
+$(INTERPRETER_TESTS): %: %.expr
+	cat $@.input | ../rc.native -i $< > $@.log && diff $@.log orig/$@.log
+	cat $@.input | ../rc.native -s $< > $@.log && diff $@.log orig/$@.log
 
 clean:
-	rm *.log *.s *~
+	rm -f my_test*.log test*.log *.s *~ $(TESTS)

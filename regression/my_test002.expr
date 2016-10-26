@@ -1,0 +1,34 @@
+fun two() begin
+    return 2;
+    return 3
+end
+
+fun write_42() begin
+    write(42);
+    return 0
+end
+
+fun assert(x) begin
+    if x
+        then return 0
+    fi;
+    while 1 do
+        skip
+    od
+end
+
+fun set_i(n) begin
+    i := n;
+    return 0
+end
+
+fun useless(x, y, z, res) begin
+    write(1000000000)
+end
+
+write(two()*2);
+write_42();
+assert(0 == 0);
+i := 3;
+set_i(100500);
+write(i)

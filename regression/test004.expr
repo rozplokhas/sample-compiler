@@ -1,6 +1,4 @@
-write (2*2);
-write (1-1-1-1-1);
-write (10 + 42 / 4);
-write (5 * (1 + 1));
-write (1 == 0);
-write (4 + 3 == 7 || true && 11 != 11)
+read (x);
+read (y);
+z := ((x + y) + (x - y)) + ((x - y) - (x + y));
+write (z)
