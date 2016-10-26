@@ -192,6 +192,7 @@ module Compile =
                  let x::stack' = stack in
                  (stack', [cmp (L 0) x; X86Jmpz p])
               | S_LABEL p     -> (stack, [X86Label p])
+              | S_END         -> (stack, []) (* works when there are no functions in programm *)
 	    in
 	    x86code @ compile stack' code'
       in
@@ -236,4 +237,4 @@ let build prog name =
   let outf = open_out (Printf.sprintf "%s.s" name) in
   Printf.fprintf outf "%s" (compile prog);
   close_out outf;
-  (*ignore (Sys.command (Printf.sprintf "gcc -m32 -o %s $RC_RUNTIME/runtime.o %s.s" name name))*)
+  ignore (Sys.command (Printf.sprintf "gcc -m32 -o %s $RC_RUNTIME/runtime.o %s.s" name name))
