@@ -8,7 +8,9 @@ let add_var    x   v    (vm, fm, inp,   outp) = (StringMap.add x v vm, fm, inp, 
 let add_fun    x   f    (vm, fm, inp,   outp) = (vm, StringMap.add x f fm, inp, outp)
 let find_var   x        (vm, _,  inp,   outp) = StringMap.find x vm
 let find_fun   x        (_ , fm, inp,   outp) = StringMap.find x fm
-let read_int            (vm, fm, i::is, outp) = i, (vm, fm, is, outp)
+let read_int            (vm, fm, inp,   outp) = match inp with
+                                                | i::is -> i, (vm, fm, is, outp)
+                                                | []    -> failwith "Error in 'read_int': input is empty"
 let write_int  i        (vm, fm, inp,   outp) = (vm, fm, inp, i::outp)
 let get_input           (_,  _,  inp,   _   ) = inp
 let get_output          (_,  _,  _,     outp) = outp

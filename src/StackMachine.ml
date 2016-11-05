@@ -1,4 +1,4 @@
-type i =
+type instr =
 | S_READ
 | S_WRITE
 | S_PUSH  of int
@@ -13,8 +13,7 @@ type i =
 | S_END
 | S_DROP
 
-module Interpreter =
-    struct
+module Interpreter = struct
 
     let run input full_code =
         let rec number_lines start_n = function
@@ -31,59 +30,62 @@ module Interpreter =
                 let rec jump_to_name name = function
                     | (_, S_LABEL l)::tl when l = name -> tl 
                     | _::tl                            -> jump_to_name name tl
+                    | []                               -> failwith @@ "Fail: unknown label '" ^ name ^ "'"
                 in
                 let rec jump_to_line_no n code =
                     match n, code with
                     | 0, _     -> code
                     | n, _::tl -> jump_to_line_no (n - 1) tl
+                    | _, []    -> failwith @@ "Fail: wrong line number " ^ string_of_int n
                 in  
                 match i with
                 | S_READ           ->
                     let y, env = Env.read_int env in
                     transmit (env, y::stack)
                 | S_WRITE          ->
-                    let y::stack' = stack in
+                    let y, stack' = Util.pop_one stack in
                     transmit (Env.write_int y env, stack')
                 | S_PUSH  n        ->
                     transmit (env, n::stack)
                 | S_LD    x        ->
                     transmit (env, Env.find_var x env :: stack)
                 | S_ST    x        ->
-                    let y::stack' = stack in
+                    let y, stack' = Util.pop_one stack in
                     transmit (Env.add_var x y env, stack')
                 | S_BINOP s        ->
-                    let y::x::stack' = stack in
+                    let y, x, stack' = Util.pop_two stack in
                     let r = Interpreter.BinOpEval.fun_of_string s x y in
                     transmit (env, r::stack')
                 | S_JMP   l        -> run' conf (jump_to_name l full_code)
                 | S_JMPZ  l        ->
-                    let x::stack' = stack in
+                    let x, stack' = Util.pop_one stack in
                     let conf' = (env, stack', env_stack) in
                     if x = 0
-                    then run' conf' (jump_to_name l full_code)
-                    else transmit (env, stack')
+                        then run' conf' (jump_to_name l full_code)
+                        else transmit (env, stack')
                 | S_LABEL _        -> transmit (env, stack)
                 | S_CALL (f, args) ->
                     let rec add_args args stack env =
                         match args, stack with
                         | [],          _             -> env, stack
                         | name::args', value::stack' -> add_args args' stack' (Env.add_var name value env)
+                        | _                          -> failwith "Fail: wrong number of arguments"
                     in
                     let fun_env, stack' = add_args (List.rev args) stack (Env.local env) in
                     run' (fun_env, (line_no+1)::stack', env::env_stack) (jump_to_name f full_code)
                 | S_RET            ->
-                    let res::ret_addr::stack' = stack in
-                    let old_env::env_stack' = env_stack in
+                    let res, ret_addr, stack' = Util.pop_two stack     in
+                    let old_env, env_stack'   = Util.pop_one env_stack in
                     let env' = Env.update_io (Env.get_input env) (Env.get_output env) old_env in  
                     run' (env', res::stack', env_stack') (jump_to_line_no ret_addr full_code)
                 | S_END            -> List.rev @@ Env.get_output env
                 | S_DROP           ->
-                    let _::stack' = stack in
+                    let _, stack' = Util.pop_one stack in
                     transmit (env, stack')
         in
         run' (Env.with_input input, [], []) full_code
     
-  end
+end
 
 let label_counter = ref 0
 let get_and_inc r = let i = !r in r := i + 1; i
