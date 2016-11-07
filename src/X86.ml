@@ -247,9 +247,9 @@ let compile prog =
     !"\tret";
     Buffer.contents asm
 
-let build stmt name =
+let build prog name =
     let outf = open_out (Printf.sprintf "%s.s" name) in
-    Printf.fprintf outf "%s" (compile stmt);
+    Printf.fprintf outf "%s" (compile prog);
     close_out outf;
     match Sys.command (Printf.sprintf "gcc -m32 -o %s $RC_RUNTIME/runtime.o %s.s" name name) with
     | 0 -> ()

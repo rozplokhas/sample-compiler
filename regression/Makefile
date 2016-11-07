@@ -10,7 +10,7 @@ $(TESTS): %: %.expr
 	RC_RUNTIME=../runtime ../rc.native -o   $< && cat $@.input | ./$@ > $@.log && diff $@.log orig/$@.log
 	cat $@.input | ../rc.native -i $< > $@.log && diff $@.log orig/$@.log
 	cat $@.input | ../rc.native -s $< > $@.log && diff $@.log orig/$@.log
-	
+
 $(INTERPRETER_TESTS): %: %.expr
 	cat $@.input | ../rc.native -i $< > $@.log && diff $@.log orig/$@.log
 	cat $@.input | ../rc.native -s $< > $@.log && diff $@.log orig/$@.log
