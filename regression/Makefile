@@ -7,10 +7,10 @@ INTERPRETER_TESTS=my_test001 my_test002 test011
 check: $(TESTS) $(INTERPRETER_TESTS) 
 
 $(TESTS): %: %.expr
+	RC_RUNTIME=../runtime ../rc.native -o   $< && cat $@.input | ./$@ > $@.log && diff $@.log orig/$@.log
 	cat $@.input | ../rc.native -i $< > $@.log && diff $@.log orig/$@.log
 	cat $@.input | ../rc.native -s $< > $@.log && diff $@.log orig/$@.log
-	RC_RUNTIME=../runtime ../rc.native      $< && cat $@.input | ./$@ > $@.log && diff $@.log orig/$@.log
-
+	
 $(INTERPRETER_TESTS): %: %.expr
 	cat $@.input | ../rc.native -i $< > $@.log && diff $@.log orig/$@.log
 	cat $@.input | ../rc.native -s $< > $@.log && diff $@.log orig/$@.log

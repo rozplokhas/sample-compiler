@@ -230,13 +230,13 @@ let compile prog =
         then (fun () -> ()), (fun () -> ())
         else
             (fun () ->
-                 !"\tpushl\t%ebp";
-                 !"\tmovl\t%esp,\t%ebp";
-                 !(Printf.sprintf "\tsubl\t$%d,\t%%esp" (env#allocated * word_size))
+                !"\tpushl\t%ebp";
+                !"\tmovl\t%esp,\t%ebp";
+                !(Printf.sprintf "\tsubl\t$%d,\t%%esp" (env#allocated * word_size))
             ),
             (fun () ->
-                 !"\tmovl\t%ebp,\t%esp";
-                 !"\tpopl\t%ebp"
+                !"\tmovl\t%ebp,\t%esp";
+                !"\tpopl\t%ebp"
             )
     in
     !"_main:";
@@ -247,8 +247,10 @@ let compile prog =
     !"\tret";
     Buffer.contents asm
 
-let build prog name =
+let build stmt name =
     let outf = open_out (Printf.sprintf "%s.s" name) in
-    Printf.fprintf outf "%s" (compile prog);
+    Printf.fprintf outf "%s" (compile stmt);
     close_out outf;
-    ignore (Sys.command (Printf.sprintf "gcc -m32 -o %s $RC_RUNTIME/runtime.o %s.s" name name))
+    match Sys.command (Printf.sprintf "gcc -m32 -o %s $RC_RUNTIME/runtime.o %s.s" name name) with
+    | 0 -> ()
+    | _ -> failwith "gcc failed with non-zero exit code"
