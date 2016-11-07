@@ -1,32 +1,3 @@
-module BinOpEval : sig
-
-    val fun_of_string : string -> int -> int -> int
-
-end = struct
-
-    let intf_of_boolf : (int -> int -> bool) -> int -> int -> int =
-        fun op x y -> if op x y then 1 else 0
-
-    let fun_of_string s = List.assoc s
-        [
-            "+",  ( +   );
-            "-",  ( -   );
-            "*",  ( *   );
-            "/",  ( /   );
-            "%",  ( mod );
-            "<",  intf_of_boolf ( <  );
-            "<=", intf_of_boolf ( <= );
-            ">",  intf_of_boolf ( >  );
-            ">=", intf_of_boolf ( >= );
-            "==", intf_of_boolf ( =  );
-            "!=", intf_of_boolf ( <> );
-            "&&", intf_of_boolf (fun x y -> x <> 0 && y <> 0);
-            "!!", intf_of_boolf (fun x y -> x <> 0 || y <> 0)
-        ]
-
-end
-
-
 module Expr = struct
 
     open Language.Expr
@@ -37,7 +8,7 @@ module Expr = struct
     | Binop  (s, xe, ye) ->
         let x, env = eval env xe in
         let y, env = eval env ye in
-        BinOpEval.fun_of_string s x y, env
+        Util.BinOpEval.fun_of_string s x y, env
     | Funcall (f, arges) ->
         let args, env = List.fold_left
                             (fun (acc, env) arge -> let arg, env = eval env arge in (acc @ [arg], env))
@@ -82,6 +53,17 @@ module Stmt = struct
         in if b <> 0
            then eval env (Seq (s, While (e, s)))
            else None, env
+    | Repeat (s, e)      ->
+        let r, env = eval env s in
+        (
+            match r with
+            | None ->
+                let b, env = Expr.eval env e
+                in if b = 0
+                    then eval env (Repeat (s, e))
+                    else None, env 
+            | Some _ -> r, env
+        )
     | Funcall (f, arges) ->
         let _, env = Expr.eval env (Language.Expr.Funcall (f, arges))
         in None, env

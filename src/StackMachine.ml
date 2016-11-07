@@ -10,60 +10,65 @@ type instr =
 | S_LABEL of string
 | S_CALL  of string * string list
 | S_RET
-| S_END
 | S_DROP
 
-module Interpreter = struct
+module Interpreter : sig
+
+    val run : int list -> instr list -> int list
+
+end = struct
+
+    let rec number_lines start_n = function
+    | []    -> []
+    | i::is -> (start_n, i) :: number_lines (start_n + 1) is
+
+    let rec jump_to_label name = function
+    | (_, S_LABEL l)::tl when l = name -> tl 
+    | _::tl                            -> jump_to_label name tl
+    | []                               -> failwith @@ "Fail: unknown label '" ^ name ^ "'"
+
+    let rec jump_to_line_no n code =
+        match n, code with
+        | 0, _     -> code
+        | n, _::tl -> jump_to_line_no (n - 1) tl
+        | _, []    -> failwith @@ "Fail: wrong line number " ^ string_of_int n
 
     let run input full_code =
-        let rec number_lines start_n = function
-        | []    -> []
-        | i::is -> (start_n, i) :: number_lines (start_n + 1) is
-        in
         let full_code = number_lines 0 full_code
         in
-        let rec run' ((env, stack, env_stack) as conf) code =
+        let rec run_rest ((stack, env_stack) as conf) code =
+            let curr_env, env_stack = Util.pop_one env_stack in
             match code with
-            | []                  -> List.rev @@ Env.get_output env
+            | []                  -> List.rev @@ Env.get_output curr_env
             | (line_no, i)::code' ->
-                let transmit (env', stack') = run' (env', stack', env_stack) code' in
-                let rec jump_to_name name = function
-                    | (_, S_LABEL l)::tl when l = name -> tl 
-                    | _::tl                            -> jump_to_name name tl
-                    | []                               -> failwith @@ "Fail: unknown label '" ^ name ^ "'"
-                in
-                let rec jump_to_line_no n code =
-                    match n, code with
-                    | 0, _     -> code
-                    | n, _::tl -> jump_to_line_no (n - 1) tl
-                    | _, []    -> failwith @@ "Fail: wrong line number " ^ string_of_int n
+                let transmit (stack', env') = run_rest (stack', env'::env_stack) code'
                 in  
                 match i with
                 | S_READ           ->
-                    let y, env = Env.read_int env in
-                    transmit (env, y::stack)
+                    let y, env = Env.read_int curr_env in
+                    transmit (y::stack, env)
                 | S_WRITE          ->
                     let y, stack' = Util.pop_one stack in
-                    transmit (Env.write_int y env, stack')
+                    transmit (stack', Env.write_int y curr_env)
                 | S_PUSH  n        ->
-                    transmit (env, n::stack)
+                    transmit (n::stack, curr_env)
                 | S_LD    x        ->
-                    transmit (env, Env.find_var x env :: stack)
+                    transmit (Env.find_var x curr_env :: stack, curr_env)
                 | S_ST    x        ->
                     let y, stack' = Util.pop_one stack in
-                    transmit (Env.add_var x y env, stack')
+                    transmit (stack', Env.add_var x y curr_env)
                 | S_BINOP s        ->
                     let y, x, stack' = Util.pop_two stack in
-                    let r = Interpreter.BinOpEval.fun_of_string s x y in
-                    transmit (env, r::stack')
-                | S_JMP   l        -> run' conf (jump_to_name l full_code)
+                    let r = Util.BinOpEval.fun_of_string s x y in
+                    transmit (r::stack', curr_env)
+                | S_JMP   l        -> run_rest conf (jump_to_label l full_code)
                 | S_JMPZ  l        ->
                     let x, stack' = Util.pop_one stack in
-                    let conf' = (env, stack', env_stack) in
+                    let conf' = (stack', curr_env::env_stack) in
                     if x = 0
-                        then run' conf' (jump_to_name l full_code)
-                        else transmit (env, stack')
-                | S_LABEL _        -> transmit (env, stack)
+                        then run_rest conf' (jump_to_label l full_code)
+                        else transmit (stack', curr_env)
+                | S_LABEL _        -> transmit (stack, curr_env)
                 | S_CALL (f, args) ->
                     let rec add_args args stack env =
                         match args, stack with
@@ -71,39 +76,45 @@ module Interpreter = struct
                         | name::args', value::stack' -> add_args args' stack' (Env.add_var name value env)
                         | _                          -> failwith "Fail: wrong number of arguments"
                     in
-                    let fun_env, stack' = add_args (List.rev args) stack (Env.local env) in
-                    run' (fun_env, (line_no+1)::stack', env::env_stack) (jump_to_name f full_code)
+                    let fun_env, stack' = add_args (List.rev args) stack (Env.local curr_env) in
+                    run_rest ((line_no+1)::stack', fun_env::curr_env::env_stack) (jump_to_label f full_code)
                 | S_RET            ->
                     let res, ret_addr, stack' = Util.pop_two stack     in
                     let old_env, env_stack'   = Util.pop_one env_stack in
-                    let env' = Env.update_io (Env.get_input env) (Env.get_output env) old_env in  
-                    run' (env', res::stack', env_stack') (jump_to_line_no ret_addr full_code)
-                | S_END            -> List.rev @@ Env.get_output env
+                    let updated_old_env = Env.update_io (Env.get_input curr_env) (Env.get_output curr_env) old_env in  
+                    run_rest (res::stack', updated_old_env::env_stack') (jump_to_line_no ret_addr full_code)
+                (*| S_END            -> List.rev @@ Env.get_output curr_env*)
                 | S_DROP           ->
                     let _, stack' = Util.pop_one stack in
-                    transmit (env, stack')
+                    transmit (stack', curr_env)
         in
-        run' (Env.with_input input, [], []) full_code
+        run_rest ([], [Env.with_input input]) (jump_to_label "main" full_code)
     
 end
 
-let label_counter = ref 0
-let get_and_inc r = let i = !r in r := i + 1; i
+module Compile : sig
 
-module Compile = struct
+    val prog : Language.Prog.t -> instr list
+
+end = struct
 
     module FuncMap = Map.Make (String)
 
     open Language.Expr
     open Language.Stmt
 
+    let fun_label_prefix = "fun_"
+
     let rec expr f_argnames = 
         let expr' x = expr f_argnames x
         in function
-        | Var      x                       -> [S_LD   x]
-        | Const    n                       -> [S_PUSH n]
-        | Binop   (s, x, y)                -> expr' x @ expr' y @ [S_BINOP s]
-        | Language.Expr.Funcall (f, arges) -> List.concat (List.map expr' arges) @ [S_CALL ("_"^f, FuncMap.find f f_argnames)]
+        | Var                    x         -> [S_LD   x]
+        | Const                  n         -> [S_PUSH n]
+        | Binop                 (s, x, y)  -> expr' x @ expr' y @ [S_BINOP s]
+        | Language.Expr.Funcall (f, arges) -> List.concat (List.map expr' arges) @ [S_CALL (fun_label_prefix^f, FuncMap.find f f_argnames)]
+
+    let label_counter = ref 0
+    let get_and_inc r = let i = !r in r := i + 1; i
 
     let rec stmt f_argnames = 
         let stmt' x = stmt f_argnames x in
@@ -131,11 +142,21 @@ module Compile = struct
                 stmt' s               @
                [S_JMP   ("start"^no);
                 S_LABEL ("fin"^no)  ]
+        | Repeat (s, e)                     ->
+            let no = string_of_int (get_and_inc label_counter)
+            in [S_LABEL ("start"^no)] @
+                stmt' s               @
+                expr' e               @
+               [S_JMPZ  ("start"^no)]
         | Language.Stmt.Funcall (f, arges) -> expr' (Language.Expr.Funcall (f, arges)) @ [S_DROP]
         | Return e                         -> expr' e @ [S_RET]
 
     let prog (fdefs, main) =
-        let f_argnames = List.fold_left (fun fm (name, argnames, _) -> FuncMap.add name argnames fm) FuncMap.empty fdefs
-        in stmt f_argnames main @ [S_END] @ 
-                List.concat (List.map (fun (name, _, body) -> [S_LABEL ("_"^name)] @ stmt f_argnames body) fdefs)
+        let f_argnames = List.fold_left (fun fm (name, argnames, _) -> FuncMap.add name argnames fm) FuncMap.empty fdefs in
+        List.concat (List.map (fun (name, _, body) -> 
+                                    [S_LABEL (fun_label_prefix^name)] @ stmt f_argnames body
+                              )
+                              fdefs) @
+        [S_LABEL "main"] @
+        stmt f_argnames main
 end

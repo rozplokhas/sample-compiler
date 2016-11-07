@@ -1,4 +1,11 @@
-type opnd = R of int | RR of int | S of int | M of string | L of int
+type opnd =
+| R  of int    (* register          *)
+| RR of int    (* reserved register *)
+| S  of int    (* stack             *)
+| M  of string (* global variable   *)
+| C  of int    (* constant          *)
+| A  of int    (* argment           *)
+| L  of int    (* local variable    *)
 
 let x86regs = [|
     "%eax"; 
@@ -85,7 +92,8 @@ module Show = struct
         | RR i -> x86_reserved_regs.(i)
         | S  i -> Printf.sprintf "-%d(%%ebp)" (i * word_size)
         | M  x -> x
-        | L  i -> Printf.sprintf "$%d" i
+        | C  i -> Printf.sprintf "$%d" i
+
 
     let instr = function
         | X86Binop (op, s1, s2) -> Printf.sprintf "\t%s\t%s,\t%s" op (opnd s1) (opnd s2)
@@ -147,18 +155,18 @@ end = struct
                               movl eax   x    ;
                               orl  y    (RR 0);
                               xorl eax   eax  ;
-                              cmp (L 0) (RR 0);
+                              cmp (C 0) (RR 0);
                               set  "ne" "al"  ;
                               xchg eax   x    ]
                 | "&&"               ->
                      del_nop [movl x    (RR 0);
                               movl eax   x    ;
                               xorl eax   eax  ;
-                              cmp (L 0)  y    ;
+                              cmp (C 0)  y    ;
                               set  "ne"  "al" ;
                               movl eax   y    ;
                               xorl eax   eax  ;
-                              cmp (L 0) (RR 0);
+                              cmp (C 0) (RR 0);
                               set  "ne"  "al" ;
                               andl y     eax  ;
                               xchg eax   x    ]
@@ -179,7 +187,7 @@ end = struct
                                                  X86Pop (R 0)])
                         | S_PUSH n      ->
                             let s = allocate env stack in
-                            (s::stack, [movl (L n) s])
+                            (s::stack, [movl (C n) s])
                         | S_LD x        ->
                             env#local x;
                             let s = allocate env stack in
@@ -196,9 +204,8 @@ end = struct
                         | S_JMP   p     -> (stack, [X86Jmp   p])
                         | S_JMPZ  p     ->
                             let x, stack' = Util.pop_one stack in
-                            (stack', [cmp (L 0) x; X86Jmpz p])
+                            (stack', [cmp (C 0) x; X86Jmpz p])
                         | S_LABEL p     -> (stack, [X86Label p])
-                        | S_END         -> (stack, []) (* works when there are no functions in programm *)
                         | _             -> failwith "Unsupported op"
                     in
                     x86code @ compile stack' code'

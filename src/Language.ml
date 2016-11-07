@@ -49,6 +49,7 @@ module Stmt = struct
     | Seq     of t * t
     | If      of Expr.t * t * t
     | While   of Expr.t * t
+    | Repeat  of t * Expr.t
     | Funcall of string * Expr.t list
     | Return  of Expr.t
 
@@ -58,10 +59,10 @@ module Stmt = struct
         simple:
               x:IDENT s:(":=" e:!(Expr.parse)                           { Assign  (x, e)    }
                         | args:(-"(" !(Util.list0 Expr.parse) -")")     { Funcall (x, args) }
-                        )                                           { s                                                        }
-            | %"read"  "(" x:IDENT ")"                              { Read   x                                                 }
-            | %"write" "(" e:!(Expr.parse) ")"                      { Write  e                                                 }
-            | %"skip"                                               { Skip                                                     }
+                        )                                           { s                                   }
+            | %"read"  "(" x:IDENT ")"                              { Read    x                           }
+            | %"write" "(" e:!(Expr.parse) ")"                      { Write   e                           }
+            | %"skip"                                               { Skip                                }
             |      %"if" e:!(Expr.parse) %"then" s:parse
               els:(%"elif" !(Expr.parse) %"then"   parse)*
                el:(%"else"                         parse)?
@@ -71,11 +72,11 @@ module Stmt = struct
                                     ((e, s)::els)
                                     (match el with None -> Skip | Some d -> d)
                 }
-            | %"while" e:!(Expr.parse) %"do" s:parse %"od"          { While (e, s)                                             }
-            | %"repeat" s:parse %"until" e:!(Expr.parse)            { Seq   (s, While (Expr.Binop ("==", e, Expr.Const 0), s)) } (* TODO: fix *)
+            | %"while" e:!(Expr.parse) %"do" s:parse %"od"          { While  (e,  s)                      }
+            | %"repeat" s:parse %"until" e:!(Expr.parse)            { Repeat (s,  e)                      } 
             | %"for" s1:parse "," e:!(Expr.parse) "," s2:parse
-              %"do" s:parse %"od"                                   { Seq   (s1, While (e, Seq (s, s2)))                       }
-            | %"return" e:!(Expr.parse)                             { Return e                                                 }
+              %"do" s:parse %"od"                                   { Seq    (s1, While (e, Seq (s, s2))) }
+            | %"return" e:!(Expr.parse)                             { Return e                            }
     )
 
 end
