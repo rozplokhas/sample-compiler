@@ -8,12 +8,11 @@ type instr =
 | S_JMP        of string
 | S_JMPZ       of string
 | S_LABEL      of string
-| S_CALL       of string * int
+| S_CALL       of string * int              (* function label, number of arguments *)
 | S_RET
 | S_DROP
-| S_FUN_START  of string list * string list * string  (* arguments and local variables names, function end label *)
-| S_FUN_END
-| S_MAIN_START of string list                         (* inner variables names                                   *)
+| S_FUN_START  of string list * string list (* arguments and local variables names *)
+| S_MAIN_START of string list               (* inner variables names               *)
 
 module Interpreter : sig
 
@@ -82,7 +81,7 @@ end = struct
                 | S_DROP                   ->
                     let _, stack' = Util.pop_one stack in
                     transmit (stack', curr_env)
-                | S_FUN_START (args, _, _) ->
+                | S_FUN_START (args, _) ->
                     let rec add_args args stack env =
                         match args, stack with
                         | [],          _             -> env, stack
@@ -93,7 +92,6 @@ end = struct
                     let fun_env, stack' = add_args (List.rev args) stack (Env.local curr_env) in
                     run_rest (addr::stack', fun_env::curr_env::env_stack) code'
                 | S_MAIN_START _            -> failwith "More than one starting points"
-                | S_FUN_END                -> failwith "Function must return a value"
         in
         run_rest ([], [Env.with_input input]) (jump_to_main full_code)
     
@@ -156,13 +154,9 @@ end = struct
 
     let prog (fdefs, main) =
         List.concat (List.map (fun ((name, argnames, body) as fdef) -> 
-                                    [S_LABEL     (fun_name_prefix^name)   ; 
-                                     S_FUN_START (argnames               , 
-                                                  FunInfo.local_vars fdef, 
-                                                  fun_end_prefix^name    )] @
-                                     stmt body                              @
-                                    [S_LABEL     (fun_end_prefix^name)    ;
-                                     S_FUN_END                            ]
+                                    [S_LABEL     (fun_name_prefix^name)             ; 
+                                     S_FUN_START (argnames, FunInfo.local_vars fdef)] @
+                                     stmt body                             
                               )
                               fdefs) @
         [S_MAIN_START (FunInfo.local_vars ("", [], main))] @

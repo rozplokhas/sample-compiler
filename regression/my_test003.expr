@@ -1,0 +1,16 @@
+fun foo(n) begin
+    if n <= 5 then
+    	 if   n == 1 then write(0)
+    	 elif n == 2 then write(1)
+    	 elif n == 3 then write(2)
+    	 else             write(n)
+	 fi
+    elif n >= 8 then
+    	 write(10)
+    fi;
+    return 0
+end
+
+for i := 1, i <= 10, i := i + 1 do
+    foo(i)
+od

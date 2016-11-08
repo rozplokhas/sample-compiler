@@ -7,6 +7,8 @@ type opnd =
 | A  of int     (* argment                                                  *)
 | L  of int     (* local variable                                           *)
 | AS of int     (* slot for argument                                        *)
+| F  of int ref (* constant, that is unknown at the stage of compilation,
+                   but known at the stage of printing                       *)
 
 let x86regs = [|
     "%eax"; 
@@ -46,7 +48,6 @@ type instr =
 | X86Jmpz  of string
 | X86Label of string
 | X86Set   of string * string
-| Lazy     of (unit -> instr list)
 
 let addl  x y = X86Binop ("addl",  x, y)
 let subl  x y = X86Binop ("subl",  x, y)
@@ -77,9 +78,9 @@ let cmp_op_by_sign s  = List.assoc s cmps
 
 class mem_allocator =
     object(self)
-        val    allocated   = ref 0
-        method allocate n  = allocated := max n !allocated
-        method allocated   = !allocated
+        val    allocated     = ref 0
+        method allocate n    = allocated := max (n * word_size) !allocated
+        method allocated_ref = allocated
     end
 
 let allocate allocator stack =
@@ -96,12 +97,13 @@ module Show = struct
     let opnd = function
     | R  i -> x86regs.(i)
     | RR i -> x86_reserved_regs.(i)
-    | S  i -> Printf.sprintf "%d(%%esp)" ((i + 1) * word_size)
+    | S  i -> Printf.sprintf "%d(%%esp)" (i * word_size)
     | M  x -> x
     | C  i -> Printf.sprintf "$%d" i
-    | A  i -> Printf.sprintf "%d(%%ebp)" ((i + 3) * word_size)
-    | L  i -> Printf.sprintf "-%d(%%ebp)" (i      * word_size)
-    | AS i -> Printf.sprintf "-%d(%%esp)" (i      * word_size)
+    | A  i -> Printf.sprintf "%d(%%ebp)"  ((i + 2) * word_size)
+    | L  i -> Printf.sprintf "-%d(%%ebp)" ((i + 1) * word_size)
+    | AS i -> Printf.sprintf "-%d(%%esp)" ((i + 1) * word_size)
+    | F  r -> Printf.sprintf "$%d" !r
 
 
     let rec instr = function
@@ -116,7 +118,6 @@ module Show = struct
     | X86Jmpz   p           -> Printf.sprintf "\tjz\t%s"   p
     | X86Label  p           -> Printf.sprintf "%s:"        p
     | X86Set   (cmp, reg)   -> Printf.sprintf "\tset%s\t%%%s" cmp reg
-    | Lazy      _           -> failwith "Unable to print lazy instruction"
         
 end
 
@@ -126,35 +127,32 @@ module X86Env : sig
 
     type t
 
-    val global        : t
+    val global         : t
+    val local          : string list -> string list -> t
+    val allocator      : t -> mem_allocator
 
-    val local         : string list -> string list -> string -> t
+    val is_global      : t -> bool
 
-    val allocator     : t -> mem_allocator
+    val local_vars_num : t -> int
 
-    val end_label     : t -> string 
-
-    val opnd_by_ident : t -> string -> opnd
-
-    val prologue      : t -> unit -> instr list
-
-    val epilogue      : t -> unit -> instr list
+    val opnd_by_ident  : t -> string -> opnd
 
 end = struct
     
-    type t = bool * mem_allocator * (string * int) list * (string * int) list * string
+    type t = bool * mem_allocator * (string * int) list * (string * int) list
 
-    let global = (true, new mem_allocator, [], [], "")
+    let global = (true, new mem_allocator, [], [])
 
-    let local args local_vars end_label = (false, new mem_allocator, Util.number_elements_snd args, 
-                                                                     Util.number_elements_snd local_vars,
-                                                                     end_label                          )
+    let local args local_vars = (false, new mem_allocator, Util.number_elements_snd args, 
+                                                                     Util.number_elements_snd local_vars)
 
-    let allocator (_, al, _, _, _ ) = al
+    let allocator (_, al, _, _) = al
 
-    let end_label (_,  _, _, _, el) = el
+    let is_global (gf, _, _, _) = gf
 
-    let opnd_by_ident (is_global, _, args, local_vars, _) x =
+    let local_vars_num (_, _, _, local_vars) = List.length local_vars
+
+    let opnd_by_ident (is_global, _, args, local_vars) x =
         if is_global
             then M x
             else 
@@ -165,21 +163,6 @@ end = struct
                     Not_found -> L (List.assoc x local_vars)
                 with
                 Not_found -> failwith @@ "Unknown variable " ^ x
-
-    let prologue (_, allocator, _, local_vars, _) () =
-        let frame_size = (allocator#allocated + List.length local_vars) * word_size
-        in if frame_size = 0
-            then []
-            else [X86Push ebp               ;
-                  movl    esp            ebp;
-                  subl    (C frame_size) ebp]
-
-    let epilogue (is_global, allocator, _, local_vars, _) () =
-        let frame_size = (allocator#allocated + List.length local_vars) * word_size
-        in 
-        (if frame_size = 0 then []             else [movl ebp esp; X86Pop ebp]) @
-        (if is_global      then [xorl eax eax] else []                        ) @
-        [X86Ret]
 
 end
 
@@ -252,18 +235,44 @@ end = struct
             | _                  -> failwith @@ "Unsupported binary opration '" ^ op ^ "'"
         )
 
+    let prologue env = 
+      let local_size   =  X86Env.local_vars_num env * word_size in
+      let alloc_size_r = (X86Env.allocator env)#allocated_ref   in 
+        [X86Push ebp                ;
+         movl    esp ebp            ;
+         subl   (C local_size  ) esp;
+         subl   (F alloc_size_r) esp]
 
+    let function_end_code = [X86Label "function_end"    ;
+                             movl     ebp            esp;
+                             X86Pop   ebp               ;
+                             X86Ret                     ]
+
+    let del_nop code = List.filter (fun i -> i <> movl eax eax   &&
+                                             i <> xchg eax eax   &&
+                                               i <> addl (C 0) esp &&
+                                                 i <> subl (C 0) esp &&
+                                             (
+                                                 match i with
+                                                 | X86Binop ("subl", F r, _) when !r = 0 -> false
+                                                 | _ -> true
+                                               ) 
+                                   ) code 
+    
     let stack_program code =
         let rec compile env stack code =
             match code with
-            | []       -> (X86Env.epilogue env ())
+            | []       -> [movl   ebp esp;
+                           X86Pop ebp    ;
+                           xorl   eax eax;
+                           X86Ret        ]
             | i::code' ->
                 let continue stack' x86code = x86code @ compile env stack' code'
                 in match i with
                 | S_READ             -> continue [eax] [X86Call "read"]
                 | S_WRITE            -> continue [] [X86Push (R 0)  ;
-                                                  X86Call "write";
-                                                  X86Pop (R 0)   ]
+                                                     X86Call "write";
+                                                     X86Pop (R 0)   ]
                 | S_PUSH       n     ->
                     let s = allocate (X86Env.allocator env) stack in
                     continue (s::stack) [movl (C n) s]
@@ -300,37 +309,36 @@ end = struct
                     in
                     let s = allocate (X86Env.allocator env) stack' in
                     continue (s::stack') (
-                                            saves          @
-                                           [X86Call p    ;
-                                            movl    eax s] @
+                                            saves                                           @
+                                           [subl   (C (List.length saves * word_size)) esp;
+                                            X86Call p                                     ;
+                                            movl    eax                                s  ;
+                                            addl   (C (n * word_size))                 esp] @
                                            (List.map (fun r -> X86Pop r) (List.rev filled_regs))
                                          )
-                | S_RET              -> 
-                    let end_label = X86Env.end_label env
-                    in if end_label = ""
-                        then failwith "Return from global code"
-                        else continue stack [X86Jmp end_label]
+                | S_RET              ->
+                    let _, stack' = Util.pop_one stack
+                    in if X86Env.is_global env
+                        then failwith "'return' in global code"
+                        else continue stack' [X86Jmp "function_end"]
                 | S_DROP             ->
                     let _, stack' = Util.pop_one stack
                     in continue stack' []
-                | S_FUN_START (args, local_vars, end_label) ->
-                    let env = X86Env.local args local_vars end_label in
-                    [Lazy (X86Env.prologue env)] @ compile env [] code'
-                | S_FUN_END          -> continue stack (X86Env.epilogue env ())
+                | S_FUN_START (args, local_vars) ->
+                    let env = X86Env.local args local_vars in
+                    prologue env @ compile env [] code'
                 | S_MAIN_START _     ->
                     let env = X86Env.global in
-                    [X86Label "main"; Lazy (X86Env.prologue env)] @ compile env [] code'
+                    [X86Label "main"]     @
+                     prologue env         @
+                     compile env [] code'
         in
-        compile X86Env.global [] code
+        let x86code = del_nop @@ compile X86Env.global [] code
+        in if List.exists (function S_FUN_START _ -> true | _ -> false) code
+           then function_end_code @ x86code
+           else x86code
 
 end
-
-
-
-let rec forse = function
-| []           -> []
-| Lazy f :: is -> f () @ forse is
-| i      :: is -> i   :: forse is
 
 
 
@@ -346,7 +354,6 @@ let compile prog =
                         sm_code
     in
     let code = Compile.stack_program sm_code in
-    let code = forse code                    in
     let asm  = Buffer.create 1024            in
     let (!!) s = Buffer.add_string asm s     in
     let (!)  s = !!s; !!"\n"                 in

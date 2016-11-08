@@ -1,0 +1,17 @@
+fun is_even(n) begin
+    if n == 0
+    then return 1
+    fi;
+    return is_odd(n - 1)
+end
+
+fun is_odd(n) begin
+    if n == 0
+    then return 0
+    fi;
+    return is_even(n - 1)
+end
+
+for x := 6, x >= 0, x := x - 1 do
+    write(is_even(x))
+od
