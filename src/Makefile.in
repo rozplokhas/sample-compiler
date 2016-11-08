@@ -209,8 +209,8 @@ target_vendor = @target_vendor@
 SUBDIRS = 
 
 # type in sources here
-SOURCES = Language.ml Env.ml Interpreter.ml StackMachine.ml X86.ml Driver.ml
-MLI = 
+SOURCES = Util.ml Language.ml Env.ml FunInfo.ml Interpreter.ml StackMachine.ml X86.ml Driver.ml
+MLI = Env.mli
 
 # define macros that creates directiries
 mkinstalldirs = $(INSTALL_SCRIPT) -d
