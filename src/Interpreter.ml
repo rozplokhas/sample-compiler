@@ -85,12 +85,12 @@ end = struct
             match names, vals with
             | [], []       -> env
             | n::ns, v::vs -> Env.add_var n v (add_args ns vs env)
-            | _            -> failwith "Fail: wrong number of arguments"
+            | _            -> failwith "Wrong number of arguments"
         in fun (_, argnames, body) ->
             (fun args env ->
                 match Stmt.eval (add_args argnames args env) body with
                 | Some r, env -> r, env
-                | None,   _   -> failwith "Fail: function must return a value"
+                | None,   _   -> failwith "Function must return a value"
             )
 
     let interpret input (fundefs, stmt) =

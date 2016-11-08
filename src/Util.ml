@@ -27,9 +27,29 @@ end = struct
 end
 
 let pop_one = function
-    | x::xs -> x, xs
-    | []    -> failwith "Fail: stack is empty"
+| x::xs -> x, xs
+| []    -> failwith "Fail: stack is empty"
 
 let pop_two = function
-    | x::y::xs -> x, y, xs
-    | _        -> failwith "Fail: stack is empty"
+| x::y::xs -> x, y, xs
+| _        -> failwith "Stack is empty"
+
+let number_elements_fst lst =
+    let rec number_from start_n = function
+    | []      -> []
+    | x :: xs -> (start_n, x) :: number_from (start_n + 1) xs
+    in
+    number_from 0 lst
+
+let number_elements_snd lst =
+    let rec number_from start_n = function
+    | []      -> []
+    | x :: xs -> (x, start_n) :: number_from (start_n + 1) xs
+    in
+    number_from 0 lst
+
+let rec split_stack n lst =
+    match n, lst with
+    | 0, _     -> [], lst
+    | n, x::xs -> let l, r = split_stack (n - 1) xs in x::l, r
+    | _        -> failwith "Stack is empty"
