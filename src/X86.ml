@@ -6,7 +6,7 @@ type opnd =
 | C  of int     (* constant                                                 *)
 | A  of int     (* argment                                                  *)
 | L  of int     (* local variable                                           *)
-| AS of int     (* slot for argument                                        *)
+| SL of int     (* slot for passing argument / saving register              *)
 | F  of int ref (* constant, that is unknown at the stage of compilation,
                    but known at the stage of printing                       *)
 
@@ -102,7 +102,7 @@ module Show = struct
     | C  i -> Printf.sprintf "$%d" i
     | A  i -> Printf.sprintf "%d(%%ebp)"  ((i + 2) * word_size)
     | L  i -> Printf.sprintf "-%d(%%ebp)" ((i + 1) * word_size)
-    | AS i -> Printf.sprintf "-%d(%%esp)" ((i + 1) * word_size)
+    | SL i -> Printf.sprintf "-%d(%%esp)" ((i + 1) * word_size)
     | F  r -> Printf.sprintf "$%d" !r
 
 
@@ -175,7 +175,7 @@ end = struct
 
     let safe_prefix src dest =
         let memory = function
-        | S _ | M _ | A _ | L _ | AS _ -> true
+        | S _ | M _ | A _ | L _ | SL _ -> true
         | _                            -> false
         in if memory src && memory dest
             then RR 0, [movl src (RR 0)]  
@@ -300,8 +300,8 @@ end = struct
                     in
                     let saves = List.concat @@
                                     List.map (fun (opnd, i) ->
-                                                let src, pref = safe_prefix opnd (AS i)
-                                                in pref @ [movl src (AS i)] 
+                                                let src, pref = safe_prefix opnd (SL i)
+                                                in pref @ [movl src (SL i)] 
                                              ) @@ 
                                              Util.number_elements_snd (filled_regs @ rev_args)
                     in
