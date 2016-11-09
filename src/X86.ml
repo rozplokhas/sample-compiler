@@ -11,10 +11,10 @@ type opnd =
                    but known at the stage of printing                       *)
 
 let x86regs = [|
-    "%eax"; 
-    "%ebx"; 
+    "%eax";
+    "%ebx";
     "%ecx";
-    "%esi"; 
+    "%esi";
     "%edi"
 |]
 
@@ -72,7 +72,7 @@ let cmps = [
 ]
                          
 let is_cmp_op      op = List.mem op (fst @@ List.split cmps)
-let cmp_op_by_sign s  = List.assoc s cmps 
+let cmp_op_by_sign s  = List.assoc s cmps
 
 
 
@@ -130,11 +130,8 @@ module X86Env : sig
     val global         : t
     val local          : string list -> string list -> t
     val allocator      : t -> mem_allocator
-
     val is_global      : t -> bool
-
     val local_vars_num : t -> int
-
     val opnd_by_ident  : t -> string -> opnd
 
 end = struct
@@ -190,58 +187,58 @@ end = struct
                                  X86Div src   ;
                                  xchg   eax dest]
         in
-        let del_nop = List.filter (fun i -> i <> movl eax eax && i <> xchg eax eax)
-        in
         (
             match op with
             | "+"                -> let src, pref = safe_prefix y x in pref @ [addl src x]
             | "-"                -> let src, pref = safe_prefix y x in pref @ [subl src x]
             | "*"                ->
-                 (match x with
+                 (
+                    match x with
                     | S _ -> [movl  x      (RR 0);
                               imull y      (RR 0);
-                              movl  (RR 0)  x    ]
-                    | _   -> [imull y x])
+                              movl (RR 0)   x    ]
+                    | _   -> [imull y x]
+                )
             | "/"                -> div_code y x
             | "%"                -> div_code y x @ [movl edx x]
             | c when is_cmp_op c ->
                 let op = cmp_op_by_sign c in
-                del_nop [movl x  (RR 0);
-                         movl eax x    ;
-                         xorl eax eax  ;
-                         cmp  y  (RR 0);
-                         set  op "al"  ;
-                         xchg eax x    ]    
+                [movl x  (RR 0);
+                 movl eax x    ;
+                 xorl eax eax  ;
+                 cmp  y  (RR 0);
+                 set  op "al"  ;
+                 xchg eax x    ]
             | "!!"               ->
-                 del_nop [movl x    (RR 0);
-                          movl eax   x    ;
-                          orl  y    (RR 0);
-                          xorl eax   eax  ;
-                          cmp (C 0) (RR 0);
-                          set  "ne" "al"  ;
-                          xchg eax   x    ]
+                 [movl x    (RR 0);
+                  movl eax   x    ;
+                  orl  y    (RR 0);
+                  xorl eax   eax  ;
+                  cmp (C 0) (RR 0);
+                  set  "ne" "al"  ;
+                  xchg eax   x    ]
             | "&&"               ->
-                 del_nop [movl x    (RR 0);
-                          movl eax   x    ;
-                          xorl eax   eax  ;
-                          cmp (C 0)  y    ;
-                          set  "ne"  "al" ;
-                          movl eax   y    ;
-                          xorl eax   eax  ;
-                          cmp (C 0) (RR 0);
-                          set  "ne"  "al" ;
-                          andl y     eax  ;
-                          xchg eax   x    ]
+                 [movl x    (RR 0);
+                  movl eax   x    ;
+                  xorl eax   eax  ;
+                  cmp (C 0)  y    ;
+                  set  "ne"  "al" ;
+                  movl eax   y    ;
+                  xorl eax   eax  ;
+                  cmp (C 0) (RR 0);
+                  set  "ne"  "al" ;
+                  andl y     eax  ;
+                  xchg eax   x    ]
             | _                  -> failwith @@ "Unsupported binary opration '" ^ op ^ "'"
         )
 
     let prologue env = 
-      let local_size   =  X86Env.local_vars_num env * word_size in
-      let alloc_size_r = (X86Env.allocator env)#allocated_ref   in 
-        [X86Push ebp                ;
-         movl    esp ebp            ;
-         subl   (C local_size  ) esp;
-         subl   (F alloc_size_r) esp]
+        let local_size   =  X86Env.local_vars_num env * word_size in
+        let alloc_size_r = (X86Env.allocator env)#allocated_ref   in 
+            [X86Push ebp                ;
+             movl    esp ebp            ;
+             subl   (C local_size  ) esp;
+             subl   (F alloc_size_r) esp]
 
     let function_end_code = [X86Label "function_end"    ;
                              movl     ebp            esp;
@@ -250,14 +247,14 @@ end = struct
 
     let del_nop code = List.filter (fun i -> i <> movl eax eax   &&
                                              i <> xchg eax eax   &&
-                                               i <> addl (C 0) esp &&
-                                                 i <> subl (C 0) esp &&
+                                             i <> addl (C 0) esp &&
+                                             i <> subl (C 0) esp &&
                                              (
-                                                 match i with
-                                                 | X86Binop ("subl", F r, _) when !r = 0 -> false
-                                                 | _ -> true
-                                               ) 
-                                   ) code 
+                                                match i with
+                                                | X86Binop ("subl", F r, _) when !r = 0 -> false
+                                                | _ -> true
+                                             ) 
+                                   ) code
     
     let stack_program code =
         let rec compile env stack code =
@@ -297,7 +294,8 @@ end = struct
                 | S_CALL      (p, n) ->
                     let rev_args, stack' = Util.split_stack n stack in
                     let rec filled_regs = match stack' with
-                                          | (S _) :: tl -> List.map (fun (i, _) -> R i) @@ Util.number_elements_fst @@ Array.to_list x86regs
+                                          | (S _) :: tl -> List.map (fun (i, _) -> R i) @@ 
+                                                               Util.number_elements_fst @@ Array.to_list x86regs
                                           | _           -> stack'
                     in
                     let saves = List.concat @@
@@ -316,18 +314,18 @@ end = struct
                                             addl   (C (n * word_size))                 esp] @
                                            (List.map (fun r -> X86Pop r) (List.rev filled_regs))
                                          )
-                | S_RET              ->
+                | S_RET                          ->
                     let _, stack' = Util.pop_one stack
                     in if X86Env.is_global env
                         then failwith "'return' in global code"
                         else continue stack' [X86Jmp "function_end"]
-                | S_DROP             ->
+                | S_DROP                         ->
                     let _, stack' = Util.pop_one stack
                     in continue stack' []
                 | S_FUN_START (args, local_vars) ->
-                    let env = X86Env.local args local_vars in
-                    prologue env @ compile env [] code'
-                | S_MAIN_START _     ->
+                    let env = X86Env.local args local_vars
+                    in prologue env @ compile env [] code'
+                | S_MAIN_START _                 ->
                     let env = X86Env.global in
                     [X86Label "main"]     @
                      prologue env         @

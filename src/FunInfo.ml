@@ -8,7 +8,7 @@ let local_vars : Language.Prog.fundef -> string list = fun (_, args, body) ->
     in
     let rec add_vars_from_stmt acc = function
     | Read    x 
-    | Assign (x, _ )     -> check_and_add x acc 
+    | Assign (x, _ )     -> check_and_add x acc
     | While  (_, s )
     | Repeat (s, _ )     -> add_vars_from_stmt acc s
     | If     (_, s1, s2)

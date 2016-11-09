@@ -28,18 +28,18 @@ let main = ()
             | _ -> raise (Invalid_argument "invalid flag")
         in
         match parse filename with
-        | `Ok prog -> 
+        | `Ok prog ->
             (
                 match mode with
                 | `X86 ->
-                    let basename = Filename.chop_suffix filename ".expr" in 
+                    let basename = Filename.chop_suffix filename ".expr" in
                     X86.build prog basename
                 | _ ->
                     let rec read acc =
                         try
                             let r = read_int () in
                             Printf.printf "> ";
-                            read (acc @ [r]) 
+                            read (acc @ [r])
                         with End_of_file -> acc
                     in
                     let input = read [] in
@@ -51,7 +51,7 @@ let main = ()
                     List.iter (fun i -> Printf.printf "%d\n" i) output
             )
         | `Fail er -> Printf.eprintf "%s" er
-    with 
+    with
     | Invalid_argument _ ->
         Printf.printf "Usage: rc.byte <command> <name.expr>\n";
         Printf.printf "  <command> should be one of: -i, -s, -o\n"

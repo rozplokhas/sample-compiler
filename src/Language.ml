@@ -73,7 +73,7 @@ module Stmt = struct
                                     (match el with None -> Skip | Some d -> d)
                 }
             | %"while" e:!(Expr.parse) %"do" s:parse %"od"          { While  (e,  s)                      }
-            | %"repeat" s:parse %"until" e:!(Expr.parse)            { Repeat (s,  e)                      } 
+            | %"repeat" s:parse %"until" e:!(Expr.parse)            { Repeat (s,  e)                      }
             | %"for" s1:parse "," e:!(Expr.parse) "," s2:parse
               %"do" s:parse %"od"                                   { Seq    (s1, While (e, Seq (s, s2))) }
             | %"return" e:!(Expr.parse)                             { Return e                            }

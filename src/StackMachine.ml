@@ -14,6 +14,8 @@ type instr =
 | S_FUN_START  of string list * string list (* arguments and local variables names *)
 | S_MAIN_START of string list               (* inner variables names               *)
 
+
+
 module Interpreter : sig
 
     val run : int list -> instr list -> int list
@@ -47,38 +49,38 @@ end = struct
                 let transmit (stack', env') = run_rest (stack', env'::env_stack) code'
                 in  
                 match i with
-                | S_READ                   ->
+                | S_READ                ->
                     let y, env = Env.read_int curr_env in
                     transmit (y::stack, env)
-                | S_WRITE                  ->
+                | S_WRITE               ->
                     let y, stack' = Util.pop_one stack in
                     transmit (stack', Env.write_int y curr_env)
-                | S_PUSH  n                ->
+                | S_PUSH  n             ->
                     transmit (n::stack, curr_env)
-                | S_LD    x                ->
+                | S_LD    x             ->
                     transmit (Env.find_var x curr_env :: stack, curr_env)
-                | S_ST    x                ->
+                | S_ST    x             ->
                     let y, stack' = Util.pop_one stack in
                     transmit (stack', Env.add_var x y curr_env)
-                | S_BINOP s                ->
+                | S_BINOP s             ->
                     let y, x, stack' = Util.pop_two stack in
                     let r = Util.BinOpEval.fun_of_string s x y in
                     transmit (r::stack', curr_env)
-                | S_JMP   l                -> run_rest conf (jump_to_label l full_code)
-                | S_JMPZ  l                ->
+                | S_JMP   l             -> run_rest conf (jump_to_label l full_code)
+                | S_JMPZ  l             ->
                     let x, stack' = Util.pop_one stack in
                     let conf' = (stack', curr_env::env_stack) in
                     if x = 0
                         then run_rest conf' (jump_to_label l full_code)
                         else transmit (stack', curr_env)
-                | S_LABEL _                -> transmit (stack, curr_env)
-                | S_CALL (f, _)            -> run_rest ((line_no+1)::stack, curr_env::env_stack) (jump_to_label f full_code)
-                | S_RET                    ->
+                | S_LABEL _             -> transmit (stack, curr_env)
+                | S_CALL (f, _)         -> run_rest ((line_no+1)::stack, curr_env::env_stack) (jump_to_label f full_code)
+                | S_RET                 ->
                     let res, ret_addr, stack' = Util.pop_two stack     in
                     let old_env, env_stack'   = Util.pop_one env_stack in
-                    let updated_old_env = Env.update_io (Env.get_input curr_env) (Env.get_output curr_env) old_env in  
+                    let updated_old_env = Env.update_io (Env.get_input curr_env) (Env.get_output curr_env) old_env in
                     run_rest (res::stack', updated_old_env::env_stack') (jump_to_line_no ret_addr full_code)
-                | S_DROP                   ->
+                | S_DROP                ->
                     let _, stack' = Util.pop_one stack in
                     transmit (stack', curr_env)
                 | S_FUN_START (args, _) ->
@@ -91,11 +93,13 @@ end = struct
                     let addr, stack = Util.pop_one stack in
                     let fun_env, stack' = add_args (List.rev args) stack (Env.local curr_env) in
                     run_rest (addr::stack', fun_env::curr_env::env_stack) code'
-                | S_MAIN_START _            -> failwith "More than one starting points"
+                | S_MAIN_START _        -> failwith "More than one starting points"
         in
         run_rest ([], [Env.with_input input]) (jump_to_main full_code)
     
 end
+
+
 
 module Compile : sig
 
@@ -109,7 +113,6 @@ end = struct
     open Language.Stmt
 
     let fun_name_prefix = "fun_"
-    let fun_end_prefix  = "end_"
 
     let rec expr = function
     | Var                    x         -> [S_LD   x]
