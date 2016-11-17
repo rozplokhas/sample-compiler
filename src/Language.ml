@@ -4,10 +4,10 @@ open Matcher
 module Expr = struct
 
     type t =
-    | Const of int
-    | Var   of string
-    | Binop of string * t * t
-    | Funcall  of string * t list
+    | Const   of Value.t
+    | Var     of string
+    | Binop   of string * t * t
+    | Funcall of string * t list
 
     ostap (
         parse:
@@ -26,7 +26,9 @@ module Expr = struct
                 primary);
 
         primary:
-          n:DECIMAL { Const n }
+          n:DECIMAL  { Const (Value.of_int n)                                         }
+        | s:STRING   { Const (Value.of_string (String.sub s 1 (String.length s - 2))) }
+        | ch:CHAR    { Const (Value.of_int @@ Char.code ch)                           }
         | i:IDENT args:(-"(" !(Util.list0 parse) -")")?
             {
                 match args with
@@ -43,8 +45,6 @@ module Stmt = struct
 
     type t =
     | Skip
-    | Read    of string
-    | Write   of Expr.t
     | Assign  of string * Expr.t
     | Seq     of t * t
     | If      of Expr.t * t * t
@@ -60,8 +60,6 @@ module Stmt = struct
               x:IDENT s:(":=" e:!(Expr.parse)                           { Assign  (x, e)    }
                         | args:(-"(" !(Util.list0 Expr.parse) -")")     { Funcall (x, args) }
                         )                                           { s                                   }
-            | %"read"  "(" x:IDENT ")"                              { Read    x                           }
-            | %"write" "(" e:!(Expr.parse) ")"                      { Write   e                           }
             | %"skip"                                               { Skip                                }
             |      %"if" e:!(Expr.parse) %"then" s:parse
               els:(%"elif" !(Expr.parse) %"then"   parse)*

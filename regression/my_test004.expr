@@ -12,6 +12,7 @@ fun is_odd(n) begin
     return is_even(n - 1)
 end
 
-for x := 6, x >= 0, x := x - 1 do
+repeat
+	x := read();
     write(is_even(x))
-od
+until x == 0

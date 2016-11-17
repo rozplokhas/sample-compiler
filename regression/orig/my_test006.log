@@ -1,0 +1,12 @@
+> u
+This is palindrome.
+> uu
+This is palindrome.
+> boom
+This is not palindrome.
+> abacaba
+This is palindrome.
+> aaaaaaab
+This is not palindrome.
+> 
+This is palindrome.

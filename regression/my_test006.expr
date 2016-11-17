@@ -1,0 +1,21 @@
+fun check(s) begin
+	str_write(s);
+	rev_s := strmake(strlen(s), 0);
+	for i := 0, i < strlen(s), i := i + 1 do
+		strset(rev_s, i, strget(s, strlen(s) - i - 1))
+	od;
+	pref := "This is ";
+	suff := "palindrome.";
+	if strcmp(s, rev_s) == 0 then
+		res := ""
+	else
+		res := "not "
+	fi;
+	str_write(strcat(pref, strcat(res, suff)));
+	return 0
+end
+
+repeat
+	s := str_read();
+	check(s)
+until strlen(s) == 0

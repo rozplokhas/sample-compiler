@@ -7,7 +7,8 @@ let local_vars : Language.Prog.fundef -> string list = fun (_, args, body) ->
     let check_and_add x var_set = if S.mem x var_set || S.mem x arg_set then var_set else S.add x var_set
     in
     let rec add_vars_from_stmt acc = function
-    | Read    x 
+    (*
+    | Read    x*)
     | Assign (x, _ )     -> check_and_add x acc
     | While  (_, s )
     | Repeat (s, _ )     -> add_vars_from_stmt acc s

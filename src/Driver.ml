@@ -5,11 +5,13 @@ let parse infile =
     Util.parse
         (object
             inherit Matcher.t s
-            inherit Util.Lexers.ident ["read"; "write" ; "skip" ; "if"   ; "then"  ;
-                                       "elif"; "else"  ; "fi"   ; "while"; "do"    ;
-                                       "od"  ; "repeat"; "until"; "for"  ; "return";
-                                       "fun" ; "begin" ; "end"                     ] s
+            inherit Util.Lexers.ident ["skip" ; "if"   ; "then"  ; "elif"; "else"  ; 
+                                       "fi"   ; "while"; "do"    ; "od"  ; "repeat"; 
+                                       "until"; "for"  ; "return"; "fun" ; "begin" ; 
+                                       "end"                                       ] s
             inherit Util.Lexers.decimal s
+            inherit Util.Lexers.string  s
+            inherit Util.Lexers.char    s
             inherit Util.Lexers.skip [
                 Matcher.Skip.whitespaces " \t\n";
                 Matcher.Skip.lineComment "--";
@@ -34,21 +36,8 @@ let main = ()
                 | `X86 ->
                     let basename = Filename.chop_suffix filename ".expr" in
                     X86.build prog basename
-                | _ ->
-                    let rec read acc =
-                        try
-                            let r = read_int () in
-                            Printf.printf "> ";
-                            read (acc @ [r])
-                        with End_of_file -> acc
-                    in
-                    let input = read [] in
-                    let output =
-                        match mode with
-                        | `SM -> StackMachine.Interpreter.run input (StackMachine.Compile.prog prog)
-                        | _   -> Interpreter.Prog.interpret input prog
-                    in
-                    List.iter (fun i -> Printf.printf "%d\n" i) output
+                | `SM  -> StackMachine.Interpreter.run (StackMachine.Compile.prog prog)
+                | `Int -> Interpreter.Prog.interpret prog
             )
         | `Fail er -> Printf.eprintf "%s" er
     with

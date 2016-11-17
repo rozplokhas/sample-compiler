@@ -1,0 +1,12 @@
+s1 := str_read();
+s2 := str_read();
+
+str_write(s1);
+str_write(strmake(5, 101));
+write(strget(s1, 4));
+str_write(strset("man", 1, 101));
+str_write(strdup("hi"));
+str_write(strcat(s1, s2));
+write(strcmp("ab", "aaa"));
+write(strlen(s2));
+str_write(strsub(s1, 0, 4))

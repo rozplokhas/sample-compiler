@@ -1,56 +1,49 @@
-module Expr = struct
+module Expr : sig 
+
+    val eval : Env.t -> Language.Expr.t -> Value.t
+
+end = struct
 
     open Language.Expr
 
     let rec eval env = function
-    | Const   n          -> n, env
-    | Var     x          -> Env.find_var x env, env
+    | Const   n          -> n
+    | Var     x          -> Env.find_var x env
     | Binop  (s, xe, ye) ->
-        let x, env = eval env xe in
-        let y, env = eval env ye in
-        Util.BinOpEval.fun_of_string s x y, env
+        let x = Value.to_int @@ eval env xe in
+        let y = Value.to_int @@ eval env ye in
+        Value.of_int @@ Util.BinOpEval.fun_of_string s x y
     | Funcall (f, arges) ->
-        let args, env = List.fold_left
-                            (fun (acc, env) arge -> let arg, env = eval env arge in (acc @ [arg], env))
-                            ([], env)
-                            arges
-        in
-        let r, fun_env = (Env.find_fun f env) args (Env.local env)
-        in  r, Env.update_io (Env.get_input fun_env) (Env.get_output fun_env) env
+        let args = List.map (eval env) arges in
+        (Env.find_fun f env) args (Env.local env)
 
 end
 
 
-module Stmt = struct
+module Stmt : sig
+
+    val eval : Env.t -> Language.Stmt.t -> Value.t option * Env.t
+
+end = struct
 
     open Language.Stmt
 
     let rec eval env = function
-    | Skip              -> None, env
-    | Seq (l, r)        ->
+    | Skip               -> None, env
+    | Seq (l, r)         ->
         let lr, env = eval env l in
         (
             match lr with
             | None   -> eval env r
             | Some _ -> lr, env
         )
-    | Assign (x, e)     ->
-        let v, env = Expr.eval env e
-        in None, Env.add_var x v env
-    | Write e            ->
-        let i, env = Expr.eval env e
-        in None, Env.write_int i env
-    | Read x             ->
-        let i, env = Env.read_int env
-        in None, Env.add_var x i env
+    | Assign (x, e)      -> None, Env.add_var x (Expr.eval env e) env
     | If (e, st, sf)     ->
-        let b, env = Expr.eval env e
-        in if b <> 0
-           then eval env st
-           else eval env sf
+        if Value.to_int (Expr.eval env e) <> 0
+            then eval env st
+            else eval env sf
     | While (e, s)       ->
-        let b, env = Expr.eval env e
-        in if b <> 0
+        if Value.to_int (Expr.eval env e) <> 0
            then eval env (Seq (s, While (e, s)))
            else None, env
     | Repeat (s, e)      ->
@@ -58,29 +51,26 @@ module Stmt = struct
         (
             match r with
             | None ->
-                let b, env = Expr.eval env e
-                in if b = 0
+                if Value.to_int (Expr.eval env e) = 0
                     then eval env (Repeat (s, e))
                     else None, env 
             | Some _ -> r, env
         )
     | Funcall (f, arges) ->
-        let _, env = Expr.eval env (Language.Expr.Funcall (f, arges))
+        let _ = Expr.eval env (Language.Expr.Funcall (f, arges))
         in None, env
-    | Return e           ->
-        let r, env = Expr.eval env e
-        in Some r, env
+    | Return e           -> Some (Expr.eval env e), env
 
 end
 
 
 module Prog : sig
 
-    val interpret : int list -> Language.Prog.t -> int list
+    val interpret : Language.Prog.t -> unit
 
 end = struct
 
-    let fun_of_fundef : Language.Prog.fundef -> (int list -> Env.t -> int * Env.t) =
+    let fun_of_fundef : Language.Prog.fundef -> (Value.t list -> Env.t -> Value.t) =
         let rec add_args names vals env =
             match names, vals with
             | [], []       -> env
@@ -89,17 +79,20 @@ end = struct
         in fun (_, argnames, body) ->
             (fun args env ->
                 match Stmt.eval (add_args argnames args env) body with
-                | Some r, env -> r, env
-                | None,   _   -> failwith "Function must return a value"
+                | Some r, _ -> r
+                | None  , _ -> failwith "Function must return a value"
             )
 
-    let interpret input (fundefs, stmt) =
-        let start_env = List.fold_left
-                            (fun env ((f, _, _) as fdef) -> Env.add_fun f (fun_of_fundef fdef) env)
-                            (Env.with_input input)
-                            fundefs
+    let interpret (fundefs, stmt) =
+        let funs = List.map (fun (f, _, _) as fdef -> f, fun_of_fundef fdef) fundefs @ BuiltIns.list
         in
-        let _, res_env = Stmt.eval start_env stmt in
-        List.rev @@ Env.get_output res_env
+        let start_env = List.fold_left
+                            (fun env (fname, f) -> Env.add_fun fname f env)
+                            Env.empty
+                            funs
+        in
+        match Stmt.eval start_env stmt with
+        | None  , _ -> ()
+        | Some _, _ -> failwith "Return from global code"
 
 end

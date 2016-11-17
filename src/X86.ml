@@ -183,8 +183,8 @@ end = struct
 
     let bin_op_code x y op =
         let div_code src dest = [xchg   eax dest;
-                                 X86Cdq       ;
-                                 X86Div src   ;
+                                 X86Cdq         ;
+                                 X86Div src     ;
                                  xchg   eax dest]
         in
         (
@@ -266,13 +266,14 @@ end = struct
             | i::code' ->
                 let continue stack' x86code = x86code @ compile env stack' code'
                 in match i with
+                (* 
                 | S_READ             -> continue [eax] [X86Call "read"]
                 | S_WRITE            -> continue [] [X86Push (R 0)  ;
                                                      X86Call "write";
-                                                     X86Pop (R 0)   ]
+                                                     X86Pop (R 0)   ] *)
                 | S_PUSH       n     ->
                     let s = allocate (X86Env.allocator env) stack in
-                    continue (s::stack) [movl (C n) s]
+                    continue (s::stack) [movl (C (Value.to_int n)) s]
                 | S_LD         id    ->
                     let x = X86Env.opnd_by_ident env id in
                     let s = allocate (X86Env.allocator env) stack in
