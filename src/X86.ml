@@ -7,6 +7,7 @@ type opnd =
 | A  of int     (* argment                                                  *)
 | L  of int     (* local variable                                           *)
 | SL of int     (* slot for passing argument / saving register              *)
+| O  of string  (* object pointer                                           *)
 | F  of int ref (* constant, that is unknown at the stage of compilation,
                    but known at the stage of printing                       *)
 
@@ -98,11 +99,12 @@ module Show = struct
     | R  i -> x86regs.(i)
     | RR i -> x86_reserved_regs.(i)
     | S  i -> Printf.sprintf "%d(%%esp)" (i * word_size)
-    | M  x -> x
+    | M  x -> "var_" ^ x
     | C  i -> Printf.sprintf "$%d" i
     | A  i -> Printf.sprintf "%d(%%ebp)"  ((i + 2) * word_size)
     | L  i -> Printf.sprintf "-%d(%%ebp)" ((i + 1) * word_size)
     | SL i -> Printf.sprintf "-%d(%%esp)" ((i + 1) * word_size)
+    | O  s -> "$" ^ s
     | F  r -> Printf.sprintf "$%d" !r
 
 
@@ -266,14 +268,12 @@ end = struct
             | i::code' ->
                 let continue stack' x86code = x86code @ compile env stack' code'
                 in match i with
-                (* 
-                | S_READ             -> continue [eax] [X86Call "read"]
-                | S_WRITE            -> continue [] [X86Push (R 0)  ;
-                                                     X86Call "write";
-                                                     X86Pop (R 0)   ] *)
                 | S_PUSH       n     ->
                     let s = allocate (X86Env.allocator env) stack in
-                    continue (s::stack) [movl (C (Value.to_int n)) s]
+                    continue (s::stack) [movl (C n) s]
+                | S_SPUSH      p     ->
+                    let s = allocate (X86Env.allocator env) stack in
+                    continue (s::stack) [movl (O p) s]
                 | S_LD         id    ->
                     let x = X86Env.opnd_by_ident env id in
                     let s = allocate (X86Env.allocator env) stack in
@@ -341,8 +341,30 @@ end
 
 
 
+module StringMap = Map.Make (String)
+
+let get_string_constants : StackMachine.instr list -> StackMachine.instr list * (string * string) list =
+    let open StackMachine in
+    let rec get_string_constants count smap acc = function
+    | []              -> List.rev acc, StringMap.bindings smap
+    | S_SPUSH s :: tl -> if StringMap.mem s smap
+                         then 
+                            get_string_constants count
+                                                 smap 
+                                                 (S_SPUSH (StringMap.find s smap) :: acc)
+                                                 tl
+                         else
+                            let constant_name = "string_" ^ string_of_int count in
+                            get_string_constants (count + 1) 
+                                                 (StringMap.add s constant_name smap)
+                                                 (S_SPUSH  constant_name         :: acc)
+                                                 tl
+    | hd        :: tl -> get_string_constants count smap (hd :: acc) tl
+    in get_string_constants 0 StringMap.empty []
+
 let compile prog =
     let sm_code = StackMachine.Compile.prog prog in
+    let sm_code, string_constants = get_string_constants sm_code in
     let inner_vars =
         List.fold_left (fun res i -> 
                             match i with
@@ -356,11 +378,15 @@ let compile prog =
     let asm  = Buffer.create 1024            in
     let (!!) s = Buffer.add_string asm s     in
     let (!)  s = !!s; !!"\n"                 in
-    !"\t.text";
+    (*match string_constants, inner_vars with [], [] -> () | _ ->*) !"\t.data";
     List.iter (fun x ->
-                !(Printf.sprintf "\t.comm\t%s,\t%d,\t%d" x word_size word_size)
+                !(Printf.sprintf "\t.comm\t%s,\t%d,\t%d" (Show.opnd (M x)) word_size word_size)
               )
               inner_vars;
+    List.iter (fun (str, name) ->
+                !!(Printf.sprintf "%s:\n\t.int %d\n\t.ascii \"%s\"\n" name (String.length str) str)
+              ) string_constants;
+    !"\t.text";
     !"\t.globl\tmain";
     List.iter (fun i -> !(Show.instr i)) code;
     Buffer.contents asm
@@ -370,7 +396,7 @@ let compile prog =
 let build prog name =
     let outf = open_out (Printf.sprintf "%s.s" name) in
     Printf.fprintf outf "%s" (compile prog);
-    close_out outf;
+    close_out outf(*;
     match Sys.command (Printf.sprintf "gcc -m32 -o %s $RC_RUNTIME/runtime.o %s.s" name name) with
     | 0 -> ()
-    | _ -> failwith "gcc failed with non-zero exit code"
+    | _ -> failwith "gcc failed with non-zero exit code"*)

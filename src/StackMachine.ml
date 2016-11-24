@@ -1,5 +1,6 @@
 type instr =
-| S_PUSH       of Value.t
+| S_PUSH       of int
+| S_SPUSH      of string
 | S_LD         of string
 | S_ST         of string
 | S_BINOP      of string
@@ -46,8 +47,10 @@ end = struct
                 let transmit (stack', env') = run_rest (stack', env'::env_stack) code'
                 in  
                 match i with
-                | S_PUSH  v             ->
-                    transmit (v::stack, curr_env)
+                | S_PUSH  n             ->
+                    transmit (Value.of_int    n :: stack, curr_env)
+                | S_SPUSH s             ->
+                    transmit (Value.of_string s :: stack, curr_env)
                 | S_LD    x             ->
                     transmit (Env.find_var x curr_env :: stack, curr_env)
                 | S_ST    x             ->
@@ -116,8 +119,9 @@ end = struct
     let rec expr fun_names = 
         let expr' e = expr fun_names e in
         function
-        | Var                    x         -> [S_LD   x]
-        | Const                  n         -> [S_PUSH n]
+        | Var                    x         -> [S_LD    x]
+        | Const                  n         -> [S_PUSH  n]
+        | StrConst               s         -> [S_SPUSH s]
         | Binop                 (s, x, y)  -> expr' x @ expr' y @ [S_BINOP s]
         | Language.Expr.Funcall (f, arges) -> List.concat (List.map expr' arges) @ [S_CALL ((if StringSet.mem f fun_names 
                                                                                                 then fun_name_prefix^f

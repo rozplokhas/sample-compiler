@@ -4,10 +4,11 @@ open Matcher
 module Expr = struct
 
     type t =
-    | Const   of Value.t
-    | Var     of string
-    | Binop   of string * t * t
-    | Funcall of string * t list
+    | Const    of int
+    | StrConst of string
+    | Var      of string
+    | Binop    of string * t * t
+    | Funcall  of string * t list
 
     ostap (
         parse:
@@ -26,11 +27,11 @@ module Expr = struct
                 primary);
 
         primary:
-          n:DECIMAL  { Const (Value.of_int n)                                         }
-        | s:STRING   { Const (Value.of_string (String.sub s 1 (String.length s - 2))) }
-        | ch:CHAR    { Const (Value.of_int @@ Char.code ch)                           }
-        | "true"     { Const (Value.of_int 1)                                         }
-        | "false"    { Const (Value.of_int 0)                                         }
+          n:DECIMAL  { Const n                                         }
+        | s:STRING   { StrConst (String.sub s 1 (String.length s - 2)) }
+        | ch:CHAR    { Const (Char.code ch)                            }
+        | "true"     { Const 1                                         }
+        | "false"    { Const 0                                         }
         | i:IDENT args:(-"(" !(Util.list0 parse) -")")?
             {
                 match args with

@@ -7,13 +7,14 @@ end = struct
     open Language.Expr
 
     let rec eval env = function
-    | Const   n          -> n
-    | Var     x          -> Env.find_var x env
-    | Binop  (s, xe, ye) ->
+    | Const    n          -> Value.of_int    n
+    | StrConst s          -> Value.of_string s
+    | Var      x          -> Env.find_var x env
+    | Binop   (s, xe, ye) ->
         let x = Value.to_int @@ eval env xe in
         let y = Value.to_int @@ eval env ye in
         Value.of_int @@ Util.BinOpEval.fun_of_string s x y
-    | Funcall (f, arges) ->
+    | Funcall (f, arges)  ->
         let args = List.map (eval env) arges in
         (Env.find_fun f env) args (Env.local env)
 
