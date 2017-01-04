@@ -41,6 +41,6 @@ let main = ()
             )
         | `Fail er -> Printf.eprintf "%s" er
     with
-    | Invalid_argument _ ->
+    | Invalid_argument "invalid flag" ->
         Printf.printf "Usage: rc.byte <command> <name.expr>\n";
         Printf.printf "  <command> should be one of: -i, -s, -o\n"

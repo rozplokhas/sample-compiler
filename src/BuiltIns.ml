@@ -81,6 +81,39 @@ let str_sub args env =
     let s,  i,  l  = Value.to_string sv, Value.to_int iv, Value.to_int lv in
     Value.of_string (Bytes.sub s i l)
 
+let arrcreate args env =
+    match args with
+    | []       -> MatchList.fail ()
+    | n::elems -> Value.of_array @@ Array.of_list elems
+
+let arrget args env =
+    let av, iv = MatchList.match_with_two args       in
+    let a,  i  = Value.to_array av, Value.to_int iv in
+    Array.get a i
+
+let arrset args env =
+    let rec set_element arv indices value =
+        let arr = Value.to_array arv in 
+        match indices with
+        | [index] -> Array.set arr index value
+        | _ -> let indices, last_ind = Util.nip_last indices
+               in set_element (Array.get arr last_ind) indices value
+    in
+    match args with
+    | n::arr::value::indices -> let indices = List.map Value.to_int indices
+                                in set_element arr indices value;
+                                Value.of_int 0
+    | _ -> MatchList.fail () 
+
+let arrlen args env =
+        let av = MatchList.match_with_one args in
+        let a  = Value.to_array av             in
+        Value.of_int @@ Array.length a
+
+let arrmake args env =
+    let nv, v = MatchList.match_with_two args in
+    let n     = Value.to_int nv               in
+    Value.of_array (Array.make n v)
 
 let list : (string * (Value.t list -> Env.t -> Value.t)) list =
     ["read"     , read     ;
@@ -94,4 +127,11 @@ let list : (string * (Value.t list -> Env.t -> Value.t)) list =
      "str_cat"  , str_cat  ;
      "str_cmp"  , str_cmp  ;
      "str_len"  , str_len  ;
-     "str_sub"  , str_sub  ]
+     "str_sub"  , str_sub  ;
+     "arrcreate", arrcreate;
+     "Arrcreate", arrcreate;
+     "arrget"   , arrget   ;
+     "arrset"   , arrset   ;
+     "arrlen"   , arrlen   ;
+     "arrmake"  , arrmake  ;
+     "Arrmake"  , arrmake  ]

@@ -3,4 +3,3 @@ _build
 *.native
 *.o
 *.log
-*.s

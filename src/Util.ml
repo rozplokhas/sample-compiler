@@ -26,13 +26,13 @@ end = struct
 
 end
 
-let pop_one = function
+let pop_one = (function
 | x::xs -> x, xs
-| []    -> failwith "Stack is empty"
+| []    -> failwith "Stack is empty")
 
-let pop_two = function
+let pop_two = (function
 | x::y::xs -> x, y, xs
-| _        -> failwith "Stack is empty"
+| _        -> failwith "Stack is empty")
 
 let number_elements_fst lst =
     let rec number_from start_n = function
@@ -53,3 +53,8 @@ let rec split_stack n lst =
     | 0, _     -> [], lst
     | n, x::xs -> let l, r = split_stack (n - 1) xs in x::l, r
     | _        -> failwith "Stack is empty"
+
+let rec nip_last = (function
+| []    -> failwith "List is empty"
+| [x]   -> [], x
+| x::xs -> let xs', last = nip_last xs in x::xs', last)

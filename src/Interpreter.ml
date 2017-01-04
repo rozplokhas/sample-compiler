@@ -9,6 +9,9 @@ end = struct
     let rec eval env = function
     | Const    n          -> Value.of_int    n
     | StrConst s          -> Value.of_string s
+    | Array   (boxed, es) ->
+        let elements = List.map (eval env) es in
+        Value.of_array @@ Array.of_list elements
     | Var      x          -> Env.find_var x env
     | Binop   (s, xe, ye) ->
         let x = Value.to_int @@ eval env xe in
@@ -17,6 +20,10 @@ end = struct
     | Funcall (f, arges)  ->
         let args = List.map (eval env) arges in
         (Env.find_fun f env) args (Env.local env)
+    | GetElement (ae, ie) ->
+        let a = Value.to_array @@ eval env ae in
+        let i = Value.to_int @@ eval env ie in
+        Array.get a i
 
 end
 
@@ -30,24 +37,28 @@ end = struct
     open Language.Stmt
 
     let rec eval env = function
-    | Skip               -> None, env
-    | Seq (l, r)         ->
+    | Skip                    -> None, env
+    | Seq (l, r)              ->
         let lr, env = eval env l in
         (
             match lr with
             | None   -> eval env r
             | Some _ -> lr, env
         )
-    | Assign (x, e)      -> None, Env.add_var x (Expr.eval env e) env
-    | If (e, st, sf)     ->
+    | Assign     (x, e)       -> None, Env.add_var x (Expr.eval env e) env
+    | SetElement (x, ies, ve) ->
+        let indices, value = List.map (Expr.eval env) ies, Expr.eval env ve
+        in BuiltIns.arrset ([Value.of_int 0; Env.find_var x env; value] @ indices) env;
+        None, env
+    | If         (e, st,  sf) ->
         if Value.to_int (Expr.eval env e) <> 0
             then eval env st
             else eval env sf
-    | While (e, s)       ->
+    | While      (e, s)       ->
         if Value.to_int (Expr.eval env e) <> 0
            then eval env (Seq (s, While (e, s)))
            else None, env
-    | Repeat (s, e)      ->
+    | Repeat     (s, e)       ->
         let r, env = eval env s in
         (
             match r with

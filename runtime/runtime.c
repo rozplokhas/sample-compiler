@@ -1,11 +1,17 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdarg.h>
 
 typedef struct {
     int tag;
     char content[0];
 } string_t;
+
+typedef struct {
+    int tag;
+    int content[0];
+} arr_t;
 
 extern int read() {
     int d;
@@ -113,4 +119,78 @@ extern int str_write(string_t *s) {
     putchar('\n');
 
     return 0;
+}
+
+extern arr_t * arrcreate(int n, ...) {
+    arr_t *arr = malloc(4 + 4 * n);
+    arr->tag = (1 << 24) + n;
+    va_list elements;
+
+    va_start(elements, n);
+
+    for (int i = 0; i < n; i++) {
+        arr->content[i] = va_arg(elements, int);
+    }
+
+    va_end(elements);
+
+    return arr;
+}
+
+extern arr_t * Arrcreate(int n, ...) {
+    arr_t *arr = malloc(4 + 4 * n);
+    arr->tag = (2 << 24) + n;
+    va_list elements;
+
+    va_start(elements, n);
+
+    for (int i = 0; i < n; i++) {
+        arr->content[i] = va_arg(elements, int);
+    }
+
+    va_end(elements);
+
+    return arr;
+}
+
+extern int arrget(arr_t *arr, int ind) {
+    return arr->content[ind];
+}
+
+extern int arrset(int n, arr_t *arr, int value, ...) {
+    va_list indices;
+    va_start(indices, value);
+
+    while (n-- > 1) {
+        arr = (arr_t *)arrget(arr, va_arg(indices, int));
+    }
+
+    arr->content[va_arg(indices, int)] = value;
+    return 0;
+}
+
+extern int arrlen(arr_t *a) {
+    return a->tag & ((1 << 24) - 1);
+}
+
+extern arr_t * arrmake(int n, int v) {
+    arr_t *a = malloc(4 + 4 * n);
+    a->tag = (1 << 24) + n;
+    
+    for (int i = 0; i < n; i++) {
+        a->content[i] = v;
+    }
+
+    return a;
+}
+
+extern arr_t * Arrmake(int n, int v) {
+    arr_t *a = malloc(4 + 4 * n);
+    a->tag = (2 << 24) + n;
+    
+    for (int i = 0; i < n; i++) {
+        a->content[i] = v;
+    }
+
+    return a;
 }

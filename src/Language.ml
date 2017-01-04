@@ -4,11 +4,13 @@ open Matcher
 module Expr = struct
 
     type t =
-    | Const    of int
-    | StrConst of string
-    | Var      of string
-    | Binop    of string * t * t
-    | Funcall  of string * t list
+    | Const      of int
+    | StrConst   of string
+    | Array      of bool * t list
+    | Var        of string
+    | Binop      of string * t * t
+    | Funcall    of string * t list
+    | GetElement of t * t
 
     ostap (
         parse:
@@ -27,16 +29,22 @@ module Expr = struct
                 primary);
 
         primary:
-          n:DECIMAL  { Const n                                         }
-        | s:STRING   { StrConst (String.sub s 1 (String.length s - 2)) }
-        | ch:CHAR    { Const (Char.code ch)                            }
-        | "true"     { Const 1                                         }
-        | "false"    { Const 0                                         }
-        | i:IDENT args:(-"(" !(Util.list0 parse) -")")?
+          n:DECIMAL                       { Const n                                         }
+        | s:STRING                        { StrConst (String.sub s 1 (String.length s - 2)) }
+        | ch:CHAR                         { Const (Char.code ch)                            }
+        | "true"                          { Const 1                                         }
+        | "false"                         { Const 0                                         }
+        | "[" es:!(Util.list0 parse) "]"  { Array (false, es)                               }
+        | "{" es:!(Util.list0 parse) "}"  { Array (true,  es)                               }
+        | i:IDENT args:(-"(" !(Util.list0 parse) -")")? indices:(-"[" parse -"]")*
             {
-                match args with
-                | None      -> Var i
-                | Some args -> Funcall (i, args)
+                List.fold_left  (fun e i -> GetElement (e, i))
+                                (
+                                    match args with
+                                    | None      -> Var i
+                                    | Some args -> Funcall (i, args)
+                                )
+                                indices
             }
         | -"(" parse -")"
     )
@@ -48,21 +56,23 @@ module Stmt = struct
 
     type t =
     | Skip
-    | Assign  of string * Expr.t
-    | Seq     of t * t
-    | If      of Expr.t * t * t
-    | While   of Expr.t * t
-    | Repeat  of t * Expr.t
-    | Funcall of string * Expr.t list
-    | Return  of Expr.t
+    | Assign     of string * Expr.t
+    | SetElement of string * Expr.t list * Expr.t
+    | Seq        of t * t
+    | If         of Expr.t * t * t
+    | While      of Expr.t * t
+    | Repeat     of t * Expr.t
+    | Funcall    of string * Expr.t list
+    | Return     of Expr.t
 
     ostap (
         parse: s:simple d:(-";" parse)? { match d with None -> s | Some d -> Seq (s, d) };
 
         simple:
-              x:IDENT s:(":=" e:!(Expr.parse)                           { Assign  (x, e)    }
-                        | args:(-"(" !(Util.list0 Expr.parse) -")")     { Funcall (x, args) }
-                        )                                           { s                                   }
+              x:IDENT res:(  indices:(-"[" !(Expr.parse) -"]")* ":=" e:!(Expr.parse) { match indices with [] -> Assign (x, e) | _ -> SetElement (x, indices, e) }
+                          | "(" args:!(Util.list0 Expr.parse) ")"                    { Funcall (x, args)      }
+                          )                                         
+                { res }
             | %"skip"                                               { Skip                                }
             |      %"if" e:!(Expr.parse) %"then" s:parse
               els:(%"elif" !(Expr.parse) %"then"   parse)*
