@@ -11,7 +11,7 @@ end = struct
     | StrConst s          -> Value.of_string s
     | Array   (boxed, es) ->
         let elements = List.map (eval env) es in
-        Value.of_array @@ Array.of_list elements
+        Value.of_array 2 @@ Array.of_list elements
     | Var      x          -> Env.find_var x env
     | Binop   (s, xe, ye) ->
         let x = Value.to_int @@ eval env xe in
@@ -24,6 +24,7 @@ end = struct
         let a = Value.to_array @@ eval env ae in
         let i = Value.to_int @@ eval env ie in
         Array.get a i
+    | Object _            -> assert false
 
 end
 
@@ -48,7 +49,7 @@ end = struct
     | Assign     (x, e)       -> None, Env.add_var x (Expr.eval env e) env
     | SetElement (x, ies, ve) ->
         let indices, value = List.map (Expr.eval env) ies, Expr.eval env ve
-        in BuiltIns.arrset ([Value.of_int 0; Env.find_var x env; value] @ indices) env;
+        in ignore (BuiltIns.arrset ([Value.of_int 0; Env.find_var x env; value] @ indices) env);
         None, env
     | If         (e, st,  sf) ->
         if Value.to_int (Expr.eval env e) <> 0
@@ -68,10 +69,11 @@ end = struct
                     else None, env 
             | Some _ -> r, env
         )
-    | Funcall (f, arges) ->
+    | Funcall (f, arges)      ->
         let _ = Expr.eval env (Language.Expr.Funcall (f, arges))
         in None, env
-    | Return e           -> Some (Expr.eval env e), env
+    | Return e                -> Some (Expr.eval env e), env
+    | Case _                  -> assert false
 
 end
 

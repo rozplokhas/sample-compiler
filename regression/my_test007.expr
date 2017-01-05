@@ -1,0 +1,36 @@
+fun nat_of_int(n) begin
+	if (n == 0)
+	then return `Zero ()
+	else return `Succ (nat_of_int(n - 1))
+	fi
+end
+
+fun int_of_nat(N) begin
+	case N of
+	| `Zero ()  -> return 0
+	| `Succ (X) -> return (int_of_nat(X) + 1)
+	esac
+end
+
+fun plus(X, Y) begin
+	case X of
+	| `Zero ()      -> return Y
+	| `Succ (Xprev) -> return `Succ (plus(Xprev, Y))
+	esac
+end
+
+fun mult(X, Y) begin
+	case X of
+	| `Zero ()      -> return `Zero ()
+	| `Succ (Xprev) -> return plus(mult(Xprev, Y), Y)
+	esac
+end
+
+Two   := nat_of_int( 2);
+Three := nat_of_int( 3);
+Six   := nat_of_int( 6);
+Ten   := nat_of_int(10);
+
+Answer := plus(mult(Three, Ten), mult(Six, Two));
+
+write(int_of_nat(Answer))

@@ -37,24 +37,6 @@ end = struct
         | n, _::tl -> jump_to_line_no (n - 1) tl
         | _, []    -> failwith @@ "Wrong line number " ^ string_of_int n
 
-
-    (* let i_name = function
-    | S_PUSH  n             -> Printf.sprintf "S_PUSH %d" n 
-    | S_SPUSH s             -> "S_SPUSH"
-    | S_LD    x             -> "S_LD" ^ " " ^ x
-    | S_ST    x             -> "S_ST" ^ " " ^ x
-    | S_BINOP s             -> "S_BINOP"
-    | S_JMP   l             -> "S_JMP" 
-    | S_JMPZ  l             -> "S_JMPZ"
-    | S_LABEL l             -> "S_LABEL" ^ " " ^ l
-    | S_CALL (f, n)         -> Printf.sprintf "S_CALL %s %d" f n
-    | S_RET                 -> "S_RET"
-    | S_DROP                -> "S_DROP"
-    | S_FUN_START (args, _) -> "S_FUN_START"
-    | S_MAIN_START _        -> "S_MAIN_START" 
-
-    let print_s_code c = List.iter (fun (n, i) -> Printf.printf "%d. %s\n%!" n (i_name i)) c; Printf.printf "\n\n" *)
-
     let run full_code =
         let full_code = Util.number_elements_fst full_code in
         let rec run_rest ((stack, env_stack) as conf) code =
@@ -140,7 +122,10 @@ end = struct
         | Var                    x             -> [S_LD    x]
         | Const                  n             -> [S_PUSH  n]
         | Array                 (boxed, elems) -> let len = List.length elems
-                                                  in [S_PUSH len] @ List.concat (List.map expr' elems) @ [S_CALL ((if boxed then "Arrcreate" else "arrcreate"), len + 1)]
+                                                  in [S_PUSH (if boxed then 2 else 1)]   @
+                                                     [S_PUSH len]                        @ 
+                                                      List.concat (List.map expr' elems) @ 
+                                                     [S_CALL ("arrcreate", len + 2)]
         | StrConst               s             -> [S_SPUSH s]
         | Binop                 (s, x, y)      -> expr' x   @ expr' y   @ [S_BINOP s]
         | GetElement            (arr, ind)     -> expr' arr @ expr' ind @ [S_CALL ("arrget", 2)]
@@ -148,6 +133,7 @@ end = struct
                                                                                                     then fun_name_prefix^f
                                                                                                     else f), 
                                                                                                 List.length arges)]
+        | Object                 _             -> assert false
 
     let label_counter = ref 0
     let get_and_inc r = let i = !r in r := i + 1; i
@@ -192,6 +178,7 @@ end = struct
                [S_JMPZ  ("start"^no)]
         | Language.Stmt.Funcall (f, arges) -> expr' (Language.Expr.Funcall (f, arges)) @ [S_DROP]
         | Return      e                    -> expr' e @ [S_RET]
+        | Case        _                    -> assert false
 
     let prog (fdefs, main) =
         let fun_names = StringSet.of_list @@ List.map (fun (name, _, _) -> name) fdefs in

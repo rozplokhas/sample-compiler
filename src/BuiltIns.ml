@@ -30,6 +30,11 @@ let write args env =
     Printf.printf "%d\n" (Value.to_int i);
     Value.of_int 0
 
+let write_cont args env =
+    let i = MatchList.match_with_one args in
+    Printf.printf "%d" (Value.to_int i);
+    Value.of_int 0
+
 let str_read args env =
     let _ = MatchList.match_with_zero args in
     Printf.printf "> ";
@@ -39,6 +44,12 @@ let str_write args env =
     let sv = MatchList.match_with_one args         in
     let s  = Bytes.to_string @@ Value.to_string sv in
     Printf.printf "%s\n" s;
+    Value.of_int 0
+
+let str_write_cont args env =
+    let sv = MatchList.match_with_one args         in
+    let s  = Bytes.to_string @@ Value.to_string sv in
+    Printf.printf "%s" s;
     Value.of_int 0
 
 let str_make args env =
@@ -83,11 +94,11 @@ let str_sub args env =
 
 let arrcreate args env =
     match args with
-    | []       -> MatchList.fail ()
-    | n::elems -> Value.of_array @@ Array.of_list elems
+    | t::n::elems -> Value.of_array (Value.to_int t) @@ Array.of_list elems
+    | _           -> MatchList.fail ()
 
 let arrget args env =
-    let av, iv = MatchList.match_with_two args       in
+    let av, iv = MatchList.match_with_two args      in
     let a,  i  = Value.to_array av, Value.to_int iv in
     Array.get a i
 
@@ -106,32 +117,38 @@ let arrset args env =
     | _ -> MatchList.fail () 
 
 let arrlen args env =
-        let av = MatchList.match_with_one args in
-        let a  = Value.to_array av             in
-        Value.of_int @@ Array.length a
+    let av = MatchList.match_with_one args in
+    let a  = Value.to_array av             in
+    Value.of_int @@ Array.length a
 
 let arrmake args env =
     let nv, v = MatchList.match_with_two args in
     let n     = Value.to_int nv               in
-    Value.of_array (Array.make n v)
+    Value.of_array 1 (Array.make n v)
+
+let arrtag args env =
+    let av = MatchList.match_with_one args in
+    Value.of_int @@ Value.tag av
 
 let list : (string * (Value.t list -> Env.t -> Value.t)) list =
-    ["read"     , read     ;
-     "write"    , write    ;
-     "str_read" , str_read ;
-     "str_write", str_write;
-     "str_make" , str_make ;
-     "str_set"  , str_set  ;
-     "str_get"  , str_get  ;
-     "str_dup"  , str_dup  ;
-     "str_cat"  , str_cat  ;
-     "str_cmp"  , str_cmp  ;
-     "str_len"  , str_len  ;
-     "str_sub"  , str_sub  ;
-     "arrcreate", arrcreate;
-     "Arrcreate", arrcreate;
-     "arrget"   , arrget   ;
-     "arrset"   , arrset   ;
-     "arrlen"   , arrlen   ;
-     "arrmake"  , arrmake  ;
-     "Arrmake"  , arrmake  ]
+    ["read"          , read          ;
+     "write"         , write         ;
+     "write_cont"    , write_cont    ;
+     "str_read"      , str_read      ;
+     "str_write"     , str_write     ;
+     "str_write_cont", str_write_cont;
+     "str_make"      , str_make      ;
+     "str_set"       , str_set       ;
+     "str_get"       , str_get       ;
+     "str_dup"       , str_dup       ;
+     "str_cat"       , str_cat       ;
+     "str_cmp"       , str_cmp       ;
+     "str_len"       , str_len       ;
+     "str_sub"       , str_sub       ;
+     "arrcreate"     , arrcreate     ;
+     "arrget"        , arrget        ;
+     "arrset"        , arrset        ;
+     "arrlen"        , arrlen        ;
+     "arrmake"       , arrmake       ;
+     "Arrmake"       , arrmake       ;
+     "arrtag"        , arrtag        ]

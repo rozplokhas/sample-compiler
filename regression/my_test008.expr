@@ -1,0 +1,74 @@
+fun print_expr(E) begin
+	case E of
+	| `Const (N)        -> write_cont(N[0])
+	| `Var   (S)        -> str_write_cont(S)
+	| `BinOp (Op, X, Y) ->
+			str_write_cont("(");
+			print_expr(X);
+			
+			case Op of
+			| `Plus  () -> str_write_cont(" + ")
+			| `Minus () -> str_write_cont(" - ")
+			| `Mult  () -> str_write_cont(" * ")
+			| `Div   () -> str_write_cont(" / ")
+			| `Mod   () -> str_write_cont(" % ")
+			esac;
+			
+			print_expr(Y);
+			str_write_cont(")")
+	esac;
+	return 0
+end
+
+fun bin_op_eval(Op, x, y) begin
+	case Op of
+	| `Plus  () -> return x + y
+	| `Minus () -> return x - y
+	| `Mult  () -> return x * y
+	| `Div   () -> return x / y
+	| `Mod   () -> return x % y
+	esac
+end
+
+fun is_const(E) begin
+	case E of
+	| `Const (N)        -> return true
+	| `Var   (X)        -> return false
+	| `BinOp (Op, L, R) -> return false
+	esac
+end
+
+fun pre_eval(Expr) begin
+	case Expr of
+	| `Const (N)        -> return Expr
+	| `Var   (X)        -> return Expr
+	| `BinOp (Op, X, Y) ->
+		X := pre_eval(X);
+		Y := pre_eval(Y);
+		if (is_const(X) && is_const(Y))
+		then 
+			case X of `Const(N) -> x := N[0] esac;
+			case Y of `Const(N) -> y := N[0] esac;
+			return `Const( [bin_op_eval(Op, x, y)] )
+		else return `BinOp (Op, X, Y)
+		fi
+	esac
+end
+
+fun plus  (X, Y) begin return `BinOp (`Plus  (), X, Y) end
+fun minus (X, Y) begin return `BinOp (`Minus (), X, Y) end
+fun mult  (X, Y) begin return `BinOp (`Mult  (), X, Y) end
+fun div   (X, Y) begin return `BinOp (`Div   (), X, Y) end
+fun mod   (X, Y) begin return `BinOp (`Mod   (), X, Y) end
+fun var   (S)    begin return `Var   (S)               end
+fun const (n)    begin return `Const ([n])             end
+
+Tree :=	div(plus(mult(const(2), var("x")), mult(const(3), minus(const(10), const(1)))), minus(div(var("y"), const(3)), plus(const(7), mod(div(const(15), const(2)), const(5)))));
+
+print_expr(Tree);
+str_write("");
+str_write("-->");
+Tree := pre_eval(Tree);
+print_expr(Tree);
+str_write("")
+

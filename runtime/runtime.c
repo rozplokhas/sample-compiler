@@ -25,6 +25,11 @@ extern int write(int x) {
     return 0;
 }
 
+extern int write_cont(int x) {
+    printf("%d", x);
+    return 0;
+}
+
 extern string_t * str_make(int n, int c) {
     string_t *s = malloc(4 + n);
     s->tag = n;
@@ -121,25 +126,17 @@ extern int str_write(string_t *s) {
     return 0;
 }
 
-extern arr_t * arrcreate(int n, ...) {
-    arr_t *arr = malloc(4 + 4 * n);
-    arr->tag = (1 << 24) + n;
-    va_list elements;
-
-    va_start(elements, n);
-
-    for (int i = 0; i < n; i++) {
-        arr->content[i] = va_arg(elements, int);
+extern int str_write_cont(string_t *s) {
+    for (int i = 0; i < s->tag; i++) {
+        putchar(s->content[i]);
     }
 
-    va_end(elements);
-
-    return arr;
+    return 0;
 }
 
-extern arr_t * Arrcreate(int n, ...) {
+extern arr_t * arrcreate(int tag, int n, ...) {
     arr_t *arr = malloc(4 + 4 * n);
-    arr->tag = (2 << 24) + n;
+    arr->tag = (tag << 24) + n;
     va_list elements;
 
     va_start(elements, n);
@@ -193,4 +190,8 @@ extern arr_t * Arrmake(int n, int v) {
     }
 
     return a;
+}
+
+extern int arrtag(arr_t *a) {
+    return a->tag >> 24;
 }

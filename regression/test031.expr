@@ -1,0 +1,41 @@
+fun insertTree (n, T)
+	begin
+		case T of
+		  `Empty ()       -> return `Node ([n], `Empty (), `Empty ())
+		| `Node (K, L, R) ->
+			if n < K[0]
+			then return `Node (K, insertTree (n, L), R)
+			else return `Node (K, L, insertTree (n, R))
+			fi
+		esac
+	end
+
+fun printTree (T)
+	begin
+		case T of
+		  `Empty ()       -> return 0
+		| `Node (K, L, R) ->
+			str_write_cont("{");
+			printTree(L);
+			str_write_cont(" ");
+			write_cont(K[0]);
+			str_write_cont(" ");
+			printTree(R);
+			str_write_cont("}");
+			return 0
+		esac
+	end
+
+Tree := `Empty ();
+Tree := insertTree(5, Tree);
+Tree := insertTree(2, Tree);
+Tree := insertTree(7, Tree);
+Tree := insertTree(0, Tree);
+Tree := insertTree(3, Tree);
+Tree := insertTree(6, Tree);
+Tree := insertTree(9, Tree);
+Tree := insertTree(1, Tree);
+Tree := insertTree(4, Tree);
+Tree := insertTree(8, Tree);
+printTree(Tree);
+str_write("")

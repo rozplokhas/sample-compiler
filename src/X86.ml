@@ -99,7 +99,7 @@ module Show = struct
     | R  i -> x86regs.(i)
     | RR i -> x86_reserved_regs.(i)
     | S  i -> Printf.sprintf "%d(%%esp)" (i * word_size)
-    | M  x -> "var_" ^ x
+    | M  x -> x
     | C  i -> Printf.sprintf "$%d" i
     | A  i -> Printf.sprintf "%d(%%ebp)"  ((i + 2) * word_size)
     | L  i -> Printf.sprintf "-%d(%%ebp)" ((i + 1) * word_size)
@@ -309,7 +309,7 @@ end = struct
                     let s = allocate (X86Env.allocator env) stack' in
                     continue (s::stack') (
                                             saves                                           @
-                                           [subl   (C (List.length saves * word_size)) esp;
+                                           [subl   (C (List.length (filled_regs @ rev_args) * word_size)) esp;
                                             X86Call p                                     ;
                                             movl    eax                                s  ;
                                             addl   (C (n * word_size))                 esp] @
@@ -396,7 +396,7 @@ let compile prog =
 let build prog name =
     let outf = open_out (Printf.sprintf "%s.s" name) in
     Printf.fprintf outf "%s" (compile prog);
-    close_out outf(*;
+    close_out outf;
     match Sys.command (Printf.sprintf "gcc -m32 -o %s $RC_RUNTIME/runtime.o %s.s" name name) with
     | 0 -> ()
-    | _ -> failwith "gcc failed with non-zero exit code"*)
+    | _ -> failwith "gcc failed with non-zero exit code"
