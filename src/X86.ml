@@ -10,6 +10,7 @@ type opnd =
 | O  of string  (* object pointer                                           *)
 | F  of int ref (* constant, that is unknown at the stage of compilation,
                    but known at the stage of printing                       *)
+| R_ADDR        (* return address                                           *)
 
 let x86regs = [|
     "%eax";
@@ -49,6 +50,7 @@ type instr =
 | X86Jmpz  of string
 | X86Label of string
 | X86Set   of string * string
+| X86Lea   of string * opnd
 
 let addl  x y = X86Binop ("addl",  x, y)
 let subl  x y = X86Binop ("subl",  x, y)
@@ -95,17 +97,18 @@ let allocate allocator stack =
 
 module Show = struct
 
-    let opnd = function
-    | R  i -> x86regs.(i)
-    | RR i -> x86_reserved_regs.(i)
-    | S  i -> Printf.sprintf "%d(%%esp)" (i * word_size)
-    | M  x -> x
-    | C  i -> Printf.sprintf "$%d" i
-    | A  i -> Printf.sprintf "%d(%%ebp)"  ((i + 2) * word_size)
-    | L  i -> Printf.sprintf "-%d(%%ebp)" ((i + 1) * word_size)
-    | SL i -> Printf.sprintf "-%d(%%esp)" ((i + 1) * word_size)
-    | O  s -> "$" ^ s
-    | F  r -> Printf.sprintf "$%d" !r
+    let opnd = (function
+    | R    i -> x86regs.(i)
+    | RR   i -> x86_reserved_regs.(i)
+    | S    i -> Printf.sprintf "%d(%%esp)" (i * word_size)
+    | M    x -> x
+    | C    i -> Printf.sprintf "$%d" i
+    | A    i -> Printf.sprintf "%d(%%ebp)"  ((i + 2) * word_size)
+    | L    i -> Printf.sprintf "-%d(%%ebp)" ((i + 1) * word_size)
+    | SL   i -> Printf.sprintf "-%d(%%esp)" ((i + 1) * word_size)
+    | O    s -> "$" ^ s
+    | F    r -> Printf.sprintf "$%d" !r
+    | R_ADDR -> Printf.sprintf "%d(%%ebp)"  word_size)
 
 
     let rec instr = function
@@ -120,6 +123,7 @@ module Show = struct
     | X86Jmpz   p           -> Printf.sprintf "\tjz\t%s"   p
     | X86Label  p           -> Printf.sprintf "%s:"        p
     | X86Set   (cmp, reg)   -> Printf.sprintf "\tset%s\t%%%s" cmp reg
+    | X86Lea   (label, s)   -> Printf.sprintf "\tlea\t%s,\t%s" label (opnd s)
         
 end
 
@@ -169,6 +173,8 @@ end
 
 module Compile : sig
 
+    val bin_op_code : opnd -> opnd -> string -> instr list
+
     val stack_program : StackMachine.instr list -> instr list
 
 end = struct
@@ -176,9 +182,9 @@ end = struct
     open StackMachine
 
     let safe_prefix src dest =
-        let memory = function
+        let memory = (function
         | S _ | M _ | A _ | L _ | SL _ -> true
-        | _                            -> false
+        | _                            -> false)
         in if memory src && memory dest
             then RR 0, [movl src (RR 0)]  
             else src, []
@@ -291,7 +297,9 @@ end = struct
                 | S_JMPZ       p     ->
                     let x, stack' = Util.pop_one stack in
                     continue stack' [cmp (C 0) x; X86Jmpz p]
-                | S_LABEL      p     -> continue stack [X86Label p]
+                | S_LABEL      p     ->
+                    let start = if p = "main" then prologue env else []
+                    in continue stack ([X86Label p] @ start)
                 | S_CALL      (p, n) ->
                     let rev_args, stack' = Util.split_stack n stack in
                     let rec filled_regs = match stack' with
@@ -318,8 +326,8 @@ end = struct
                 | S_RET                          ->
                     let _, stack' = Util.pop_one stack
                     in if X86Env.is_global env
-                        then failwith "'return' in global code"
-                        else continue stack' [X86Jmp "function_end"]
+                       then failwith "'return' in global code"
+                       else continue stack' [X86Jmp "function_end"]
                 | S_DROP                         ->
                     let _, stack' = Util.pop_one stack
                     in continue stack' []
@@ -328,9 +336,21 @@ end = struct
                     in prologue env @ compile env [] code'
                 | S_MAIN_START _                 ->
                     let env = X86Env.global in
-                    [X86Label "main"]     @
-                     prologue env         @
                      compile env [] code'
+                | S_THROW id                     -> 
+                    let _, stack' = Util.pop_one stack in
+                    let label = "throw_" ^ (string_of_int id) in
+                    continue stack'
+                        [X86Call  label                ;
+                         X86Label label                ;
+                         X86Push  ebp                  ;
+                         movl     esp  ebp             ;
+                         X86Jmp   "handlers_dispatcher"]
+                | S_HANDLER_START                ->
+                    let s = allocate (X86Env.allocator env) stack in
+                    continue (s::stack) []
+                | S_TRY_BLOCK_START _            -> assert false
+                | S_TRY_BLOCK_END                -> assert false (* don't exist after hiding *)
         in
         let x86code = del_nop @@ compile X86Env.global [] code
         in if List.exists (function S_FUN_START _ -> true | _ -> false) code
@@ -339,7 +359,62 @@ end = struct
 
 end
 
+module ExceptionsHandling : sig
 
+    val hide_blocks : StackMachine.instr list -> StackMachine.instr list * string list
+
+    val create_dispatcher : string list -> instr list
+
+end = struct
+
+    let bin_op_code = Compile.bin_op_code
+
+    open StackMachine
+
+    let make_start_label h = "start_" ^ h
+
+    let make_end_label h = "end_" ^ h
+
+    let hide_blocks =
+        let rec hide_blocks' h_stack = function
+        | [] -> [], []
+        | (S_TRY_BLOCK_START h) :: tl ->
+            let new_code, handlers = hide_blocks' (h::h_stack) tl in 
+            (S_LABEL (make_start_label h))::new_code, handlers
+        |  S_TRY_BLOCK_END      :: tl -> 
+            let h, h_stack' = Util.pop_one h_stack                in
+            let new_code, handlers = hide_blocks' h_stack' tl     in 
+            (S_LABEL (make_end_label   h))::new_code, h::handlers
+        |  i                    :: tl -> let new_code, handlers = hide_blocks' h_stack tl in i::new_code, handlers
+        in
+        hide_blocks' []
+
+    let create_dispatcher handlers =
+        let check_handler (i, handler) =
+            let next_handler = "next_handler_" ^ (string_of_int i) in
+            [X86Lea (make_start_label handler,  R 1);
+             movl    R_ADDR                    (R 2)] @
+             bin_op_code (R 1) (R 2) "<"              @
+            [cmp                 (C 0) (R 1)        ; 
+             X86Jmpz next_handler                   ;
+             X86Lea (make_end_label handler,    R 1);
+             movl    R_ADDR                    (R 2)] @
+             bin_op_code (R 1) (R 2) ">="             @
+            [cmp                 (C 0) (R 1)        ; 
+             X86Jmpz next_handler                   ;
+             movl    ebp                        esp ;
+             X86Pop  ebp                            ;
+             X86Jmp  handler                        ;
+             X86Label next_handler                  ]
+        in
+        let wildcard =
+            [movl    ebp                        esp ;
+             X86Pop  ebp                            ;
+             X86Jmp  "handlers_dispatcher"          ]
+        in
+        [X86Label "handlers_dispatcher"] @ (List.concat @@ List.map check_handler @@ Util.number_elements_fst handlers) @ wildcard
+
+end
 
 module StringMap = Map.Make (String)
 
@@ -365,6 +440,8 @@ let get_string_constants : StackMachine.instr list -> StackMachine.instr list * 
 let compile prog =
     let sm_code = StackMachine.Compile.prog prog in
     let sm_code, string_constants = get_string_constants sm_code in
+    let sm_code, handlers         = ExceptionsHandling.hide_blocks sm_code in
+    let disppatcher_code          = ExceptionsHandling.create_dispatcher handlers in
     let inner_vars =
         List.fold_left (fun res i -> 
                             match i with
@@ -388,6 +465,7 @@ let compile prog =
               ) string_constants;
     !"\t.text";
     !"\t.globl\tmain";
+    List.iter (fun i -> !(Show.instr i)) disppatcher_code;
     List.iter (fun i -> !(Show.instr i)) code;
     Buffer.contents asm
 

@@ -1,3 +1,5 @@
+exception ClientException of Value.t
+
 module Expr : sig 
 
     val eval : Env.t -> Language.Expr.t -> Value.t
@@ -38,28 +40,28 @@ end = struct
     open Language.Stmt
 
     let rec eval env = function
-    | Skip                    -> None, env
-    | Seq (l, r)              ->
+    | Skip                        -> None, env
+    | Seq (l, r)                  ->
         let lr, env = eval env l in
         (
             match lr with
             | None   -> eval env r
             | Some _ -> lr, env
         )
-    | Assign     (x, e)       -> None, Env.add_var x (Expr.eval env e) env
-    | SetElement (x, ies, ve) ->
+    | Assign     (x, e)           -> None, Env.add_var x (Expr.eval env e) env
+    | SetElement (x, ies, ve)     ->
         let indices, value = List.map (Expr.eval env) ies, Expr.eval env ve
         in ignore (BuiltIns.arrset ([Value.of_int 0; Env.find_var x env; value] @ indices) env);
         None, env
-    | If         (e, st,  sf) ->
+    | If         (e, st,  sf)     ->
         if Value.to_int (Expr.eval env e) <> 0
             then eval env st
             else eval env sf
-    | While      (e, s)       ->
+    | While      (e, s)           ->
         if Value.to_int (Expr.eval env e) <> 0
            then eval env (Seq (s, While (e, s)))
            else None, env
-    | Repeat     (s, e)       ->
+    | Repeat     (s, e)           ->
         let r, env = eval env s in
         (
             match r with
@@ -69,11 +71,20 @@ end = struct
                     else None, env 
             | Some _ -> r, env
         )
-    | Funcall (f, arges)      ->
+    | Funcall (f, arges)          ->
         let _ = Expr.eval env (Language.Expr.Funcall (f, arges))
         in None, env
-    | Return e                -> Some (Expr.eval env e), env
-    | Case _                  -> assert false
+    | Return e                    -> Some (Expr.eval env e), env
+    | Throw  e                    -> raise (ClientException (Expr.eval env e))
+    | TryCatch (code, x, handler) ->
+        (
+            try
+                eval env code
+            with
+            ClientException e -> eval (Env.add_var x e env) handler 
+        )
+    | Case _                      -> assert false
+    | TryWith _                   -> assert false
 
 end
 

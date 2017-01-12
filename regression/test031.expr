@@ -1,7 +1,7 @@
 fun insertTree (n, T)
 	begin
 		case T of
-		  `Empty ()       -> return `Node ([n], `Empty (), `Empty ())
+		| `Empty ()       -> return `Node ([n], `Empty (), `Empty ())
 		| `Node (K, L, R) ->
 			if n < K[0]
 			then return `Node (K, insertTree (n, L), R)
@@ -13,7 +13,7 @@ fun insertTree (n, T)
 fun printTree (T)
 	begin
 		case T of
-		  `Empty ()       -> return 0
+		| `Empty ()       -> return 0
 		| `Node (K, L, R) ->
 			str_write_cont("{");
 			printTree(L);

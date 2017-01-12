@@ -8,7 +8,8 @@ let parse infile =
             inherit Util.Lexers.ident ["skip" ; "if"   ; "then"  ; "elif"; "else"  ; 
                                        "fi"   ; "while"; "do"    ; "od"  ; "repeat"; 
                                        "until"; "for"  ; "return"; "fun" ; "begin" ; 
-                                       "end"  ; "case" ; "of"    ; "esac"          ] s
+                                       "end"  ; "case" ; "of"    ; "esac"; "throw" ;
+                                       "try"  ; "with" ; "yrt"                     ] s
             inherit Util.Lexers.decimal s
             inherit Util.Lexers.string  s
             inherit Util.Lexers.char    s

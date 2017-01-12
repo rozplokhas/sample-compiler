@@ -89,7 +89,28 @@ let rec stmt_unsugar : Env.t -> Language.Stmt.t -> Language.Stmt.t * Env.t = fun
     | Return e ->
         let e, env = expr_unsugar env e in
         Return e, env
-    | Case (temp, handlers) ->
+    | Throw e ->
+        let e, env = expr_unsugar env e in
+        Throw e, env
+    | TryCatch _ -> assert false (* doesn't exist in syntax *)
+    | TryWith (code, handlers, wild) ->
+        (
+            let var_no, env = Env.fresh_no env                      in
+            let var_name = "exception_var_" ^ string_of_int var_no  in
+            let code, env = stmt_unsugar env code                   in
+            (* let handlers, env = fold_unsugar env handlers 
+                    (fun env (cons, names, handler) -> let h, env = stmt_unsugar env handler in (cons, names, h), env) in *)
+            match wild with
+            | None -> 
+                let exc = Var var_name                                                    in
+                let case, env = stmt_unsugar env (Case (exc, handlers, Some (Throw exc))) in
+                TryCatch (code, var_name, case), env
+            | Some w_handler ->
+                (* let w_handler, env = stmt_unsugar env w_handler*)
+                let case, env = stmt_unsugar env (Case (Var var_name, handlers, Some w_handler)) in
+                TryCatch (code, var_name, case), env
+        )
+    | Case (temp, handlers, wild) ->
         let var_no, env = Env.fresh_no env in
         let temp_name = "supp_case_temp_" ^ string_of_int var_no in
         let tag_name  = "supp_case_tag_"  ^ string_of_int var_no in
@@ -109,7 +130,7 @@ let rec stmt_unsugar : Env.t -> Language.Stmt.t -> Language.Stmt.t * Env.t = fun
                                 If (Binop ("==", Var tag_name, Const no), Seq (bindings, s), acc), env
                             )
                             handlers
-                            (Skip, env)
+                            ((match wild with None -> Skip | Some s -> s), env)
         in
         Seq (init, switch), env
 

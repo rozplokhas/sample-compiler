@@ -33,8 +33,7 @@ end
 fun is_const(E) begin
 	case E of
 	| `Const (N)        -> return true
-	| `Var   (X)        -> return false
-	| `BinOp (Op, L, R) -> return false
+	| _                 -> return false
 	esac
 end
 
@@ -47,8 +46,8 @@ fun pre_eval(Expr) begin
 		Y := pre_eval(Y);
 		if (is_const(X) && is_const(Y))
 		then 
-			case X of `Const(N) -> x := N[0] esac;
-			case Y of `Const(N) -> y := N[0] esac;
+			case X of | `Const(N) -> x := N[0] esac;
+			case Y of | `Const(N) -> y := N[0] esac;
 			return `Const( [bin_op_eval(Op, x, y)] )
 		else return `BinOp (Op, X, Y)
 		fi
@@ -71,4 +70,3 @@ str_write("-->");
 Tree := pre_eval(Tree);
 print_expr(Tree);
 str_write("")
-

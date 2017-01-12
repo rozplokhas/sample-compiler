@@ -1,0 +1,40 @@
+fun a(a, b) begin
+	throw (`IntException (10));
+	return a * b
+end
+
+fun b() begin
+	sum := 50 + 5 * a(4, 16);
+	write(sum)
+end
+
+fun c() begin
+	try
+		try
+			throw (`StringException ("hello"))
+		with
+		| `UnknownException ()  -> skip
+		| `StringException  (m) -> str_write(m)
+		| _                     -> str_write("Non-string exception")
+		yrt;
+		b()
+	with
+	| `ComplexException () -> str_write("hmm...") 
+	yrt
+end
+
+fun d() begin
+	try
+		c()
+	with 
+	| `IntException (n) -> write(n)
+	yrt;
+	throw (`OiException ("oi"))
+end
+
+try
+	d();
+	str_write("All is OK")
+with 
+| _ -> str_write("Unhandled exception")
+yrt

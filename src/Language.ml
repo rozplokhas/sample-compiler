@@ -68,7 +68,10 @@ module Stmt = struct
     | Repeat     of t * Expr.t
     | Funcall    of string * Expr.t list
     | Return     of Expr.t
-    | Case       of Expr.t * (string * string list * t) list
+    | Throw      of Expr.t
+    | TryCatch   of t * string * t
+    | Case       of Expr.t * (string * string list * t) list * t option
+    | TryWith    of t * (string * string list * t) list * t option 
 
     ostap (
         parse: s:simple d:(-";" parse)? { match d with None -> s | Some d -> Seq (s, d) };
@@ -84,7 +87,7 @@ module Stmt = struct
                                 { Funcall (x, args) }
                           )                                         
                 { res }
-            | %"skip"                                                           { Skip                                }
+            | %"skip"                                                                                    { Skip                                }
             |      %"if" e:!(Expr.parse) %"then" s:parse
               els:(%"elif" !(Expr.parse) %"then"   parse)*
                el:(%"else"                         parse)?
@@ -94,13 +97,14 @@ module Stmt = struct
                                     ((e, s)::els)
                                     (match el with None -> Skip | Some d -> d)
                 }
-            | %"while" e:!(Expr.parse) %"do" s:parse %"od"                      { While  (e,  s)                      }
-            | %"repeat" s:parse %"until" e:!(Expr.parse)                        { Repeat (s,  e)                      }
+            | %"while" e:!(Expr.parse) %"do" s:parse %"od"                                               { While  (e,  s)                      }
+            | %"repeat" s:parse %"until" e:!(Expr.parse)                                                 { Repeat (s,  e)                      }
             | %"for" s1:parse "," e:!(Expr.parse) "," s2:parse
-              %"do" s:parse %"od"                                               { Seq    (s1, While (e, Seq (s, s2))) }
-            | %"return" e:!(Expr.parse)                                         { Return e                            }
-            | %"case" temp:!(Expr.parse) %"of" ("|")? 
-                        hd:pattern tl:(-"|" pattern)* %"esac"                   { Case (temp, hd::tl)                 };
+              %"do" s:parse %"od"                                                                        { Seq    (s1, While (e, Seq (s, s2))) }
+            | %"return" e:!(Expr.parse)                                                                  { Return e                            }
+            | %"throw"  e:!(Expr.parse)                                                                  { Throw e                             }
+            | %"case" temp:!(Expr.parse) %"of" vs:(-"|" pattern)* wild:(-"|" -"_" -"->" parse)? %"esac"  { Case (temp, vs, wild)               }
+            | %"try" code:parse %"with" vs:(-"|" pattern)* wild:(-"|" -"_" -"->" parse)? %"yrt"          { TryWith (code, vs, wild)            };
 
         pattern: -"`" IDENT -"(" !(Util.list0 var) -")" -"->" parse;
 
